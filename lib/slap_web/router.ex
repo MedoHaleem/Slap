@@ -17,7 +17,7 @@ defmodule SlapWeb.Router do
   scope "/", SlapWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", ChatRoomLive
   end
 
   # Other scopes may use custom stacks.

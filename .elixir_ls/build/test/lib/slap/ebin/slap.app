@@ -2,6 +2,7 @@
              [{modules,['Elixir.Slap','Elixir.Slap.Application',
                         'Elixir.Slap.DataCase','Elixir.Slap.Mailer',
                         'Elixir.Slap.Repo','Elixir.SlapWeb',
+                        'Elixir.SlapWeb.ChatRoomLive',
                         'Elixir.SlapWeb.ConnCase',
                         'Elixir.SlapWeb.CoreComponents',
                         'Elixir.SlapWeb.Endpoint','Elixir.SlapWeb.ErrorHTML',
