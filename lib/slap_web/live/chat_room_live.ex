@@ -1,10 +1,10 @@
 defmodule SlapWeb.ChatRoomLive do
+  alias Slap.Chat
   alias Slap.Chat.Room
-  alias Slap.Repo
   use SlapWeb, :live_view
 
   def mount(_params, _session, socket) do
-    rooms = Room |> Repo.all()
+    rooms = Chat.list_rooms()
 
     {:ok, assign(socket, rooms: rooms)}
   end
@@ -18,7 +18,7 @@ defmodule SlapWeb.ChatRoomLive do
         :error -> List.first(rooms)
       end
 
-    {:noreply, assign(socket, hide_topic?: true, room: room)}
+    {:noreply, assign(socket, hide_topic?: true, room: room, page_title: "#" <> room.name)}
   end
 
   def render(assigns) do
