@@ -4,6 +4,7 @@
                         'Elixir.Slap.DataCase','Elixir.Slap.Mailer',
                         'Elixir.Slap.Repo','Elixir.SlapWeb',
                         'Elixir.SlapWeb.ChatRoomLive',
+                        'Elixir.SlapWeb.ChatRoomLive.Edit',
                         'Elixir.SlapWeb.ConnCase',
                         'Elixir.SlapWeb.CoreComponents',
                         'Elixir.SlapWeb.Endpoint','Elixir.SlapWeb.ErrorHTML',
