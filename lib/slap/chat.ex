@@ -1,5 +1,5 @@
 defmodule Slap.Chat do
-  alias Slap.Chat.Room
+  alias Slap.Chat.{Message,Room}
   alias Slap.Repo
   import Ecto.Query
 
@@ -25,5 +25,12 @@ defmodule Slap.Chat do
     room
     |> Room.changeset(attrs)
     |> Repo.update()
+  end
+
+  def list_messages_in_room(%Room{id: room_id}) do
+    Message
+    |> where([m], m.room_id == ^room_id)
+    |> order_by([m], asc: :inserted_at, asc: :id)
+    |> Repo.all()
   end
 end

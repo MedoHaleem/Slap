@@ -1,6 +1,6 @@
 defmodule SlapWeb.ChatRoomLive do
   alias Slap.Chat
-  alias Slap.Chat.Room
+  alias Slap.Chat.{Message, Room}
   use SlapWeb, :live_view
 
   def mount(_params, _session, socket) do
@@ -18,7 +18,15 @@ defmodule SlapWeb.ChatRoomLive do
         :error -> List.first(rooms)
       end
 
-    {:noreply, assign(socket, hide_topic?: true, room: room, page_title: "#" <> room.name)}
+    messages = Chat.list_messages_in_room(room)
+
+    {:noreply,
+     assign(socket,
+       hide_topic?: true,
+       room: room,
+       page_title: "#" <> room.name,
+       messages: messages
+     )}
   end
 
   def render(assigns) do
@@ -67,6 +75,33 @@ defmodule SlapWeb.ChatRoomLive do
             <% end %>
           </div>
         </div>
+        <ul class="relative z-10 flex items-center gap-4 px-4 sm:px-6 lg:px-8 justify-end">
+          <li class="text-[0.8125rem] leading-6 text-zinc-900">
+            {@current_user.email}
+          </li>
+
+          <li>
+            <.link
+              href={~p"/users/settings"}
+              class="text-[0.8125rem] leading-6 text-zinc-900 font-semibold hover:text-zinc-700"
+            >
+              Settings
+            </.link>
+          </li>
+
+          <li>
+            <.link
+              href={~p"/users/log_out"}
+              method="delete"
+              class="text-[0.8125rem] leading-6 text-zinc-900 font-semibold hover:text-zinc-700"
+            >
+              Log out
+            </.link>
+          </li>
+        </ul>
+      </div>
+      <div class="flex flex-col grow overflow-auto">
+        <.message :for={message <- @messages} message={message} />
       </div>
     </div>
     """
@@ -95,5 +130,25 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("toggle-topic", _params, socket) do
     {:noreply, update(socket, :hide_topic?, &(!&1))}
+  end
+
+  attr :message, Message, required: true
+
+  defp message(assigns) do
+    ~H"""
+    <div class="relative flex px-4 py-3">
+      <div class="h-10 w-10 rounded shrink-0 bg-slate-300"></div>
+
+      <div class="ml-2">
+        <div class="-mt-1">
+          <.link class="text-sm font-semibold hover:underline">
+            <span>User</span>
+          </.link>
+
+          <p class="text-sm">{@message.body}</p>
+        </div>
+      </div>
+    </div>
+    """
   end
 end
