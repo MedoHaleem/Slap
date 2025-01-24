@@ -6,6 +6,8 @@ defmodule Slap.Chat.Room do
     field :name, :string
     field :topic, :string
 
+    has_many :messages, Slap.Chat.Message
+
     timestamps(type: :utc_datetime)
   end
 

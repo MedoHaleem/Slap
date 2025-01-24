@@ -22,11 +22,40 @@ defmodule SlapWeb.ChatRoomLive do
 
     {:noreply,
      assign(socket,
-       hide_topic?: true,
+       hide_topic?: false,
+       messages: messages,
        room: room,
        page_title: "#" <> room.name,
        messages: messages
-     )}
+     )
+     |> assign_message_form(Chat.change_message(%Message{}))}
+  end
+
+  defp assign_message_form(socket, changeset) do
+    assign(socket, :new_message_form, to_form(changeset))
+  end
+
+  def handle_event("submit-message", %{"message" => message_params}, socket) do
+    %{current_user: current_user, room: room} = socket.assigns
+
+    socket =
+      case Chat.create_message(room, message_params, current_user) do
+        {:ok, message} ->
+          socket
+          |> update(:messages, &(&1 ++ [message]))
+          |> assign_message_form(Chat.change_message(%Message{}))
+
+        {:error, changeset} ->
+          assign_message_form(socket, changeset)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("validate-message", %{"message" => message_params}, socket) do
+    changeset = Chat.change_message(%Message{}, message_params)
+
+    {:noreply, assign_message_form(socket, changeset)}
   end
 
   def render(assigns) do
@@ -77,7 +106,7 @@ defmodule SlapWeb.ChatRoomLive do
         </div>
         <ul class="relative z-10 flex items-center gap-4 px-4 sm:px-6 lg:px-8 justify-end">
           <li class="text-[0.8125rem] leading-6 text-zinc-900">
-            {@current_user.email}
+            {username(@current_user)}
           </li>
 
           <li>
@@ -102,6 +131,29 @@ defmodule SlapWeb.ChatRoomLive do
       </div>
       <div class="flex flex-col grow overflow-auto">
         <.message :for={message <- @messages} message={message} />
+      </div>
+      <div class="h-12 bg-white px-4 pb-4">
+        <.form
+          id="new-message-form"
+          for={@new_message_form}
+          phx-change="validate-message"
+          phx-submit="submit-message"
+          class="flex items-center border-2 border-slate-300 rounded-sm p-1"
+        >
+          <textarea
+            class="grow text-sm px-3 border-l border-slate-300 mx-1 resize-none"
+            cols=""
+            id="chat-message-textarea"
+            name={@new_message_form[:body].name}
+            placeholder={"Message ##{@room.name}"}
+            phx-debounce
+            rows="1"
+          >{Phoenix.HTML.Form.normalize_value("textarea", @new_message_form[:body].value)}</textarea>
+
+          <button class="shrink flex items-center justify-center h-6 w-6 rounded hover:bg-slate-200">
+            <.icon name="hero-paper-airplane" class="h-4 w-4" />
+          </button>
+        </.form>
       </div>
     </div>
     """
@@ -142,7 +194,7 @@ defmodule SlapWeb.ChatRoomLive do
       <div class="ml-2">
         <div class="-mt-1">
           <.link class="text-sm font-semibold hover:underline">
-            <span>User</span>
+            <span>{username(@message.user)}</span>
           </.link>
 
           <p class="text-sm">{@message.body}</p>
@@ -150,5 +202,9 @@ defmodule SlapWeb.ChatRoomLive do
       </div>
     </div>
     """
+  end
+
+  defp username(user) do
+    user.email |> String.split("@") |> List.first() |> String.capitalize()
   end
 end
