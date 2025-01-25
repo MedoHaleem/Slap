@@ -34,7 +34,7 @@
                              postgrex,phoenix_html,phoenix_live_view,floki,
                              phoenix_live_dashboard,swoosh,finch,
                              telemetry_metrics,telemetry_poller,gettext,jason,
-                             dns_cluster,bandit]},
+                             dns_cluster,bandit,timex]},
               {description,"slap"},
               {registered,[]},
               {vsn,"0.1.0"},

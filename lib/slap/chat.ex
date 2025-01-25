@@ -1,4 +1,5 @@
 defmodule Slap.Chat do
+  alias Slap.Accounts.User
   alias Slap.Chat.{Message,Room}
   alias Slap.Repo
   import Ecto.Query
@@ -43,5 +44,10 @@ defmodule Slap.Chat do
     |> order_by([m], asc: :inserted_at, asc: :id)
     |> preload(:user)
     |> Repo.all()
+  end
+
+  def delete_message_by_id(id, %User{id: user_id}) do
+    message = %Message{user_id: ^user_id} = Repo.get(Message, id)
+    Repo.delete(message)
   end
 end
