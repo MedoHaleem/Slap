@@ -12,6 +12,8 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_params(params, _uri, socket) do
+    if socket.assings[:room], do: Chat.unsubscribe_from_room(socket.assings.room)
+
     rooms = socket.assigns.rooms
 
     room =
@@ -21,6 +23,8 @@ defmodule SlapWeb.ChatRoomLive do
       end
 
     messages = Chat.list_messages_in_room(room)
+
+    Chat.subscribe_to_room(room)
 
     {:noreply,
      assign(socket,
@@ -42,10 +46,8 @@ defmodule SlapWeb.ChatRoomLive do
 
     socket =
       case Chat.create_message(room, message_params, current_user) do
-        {:ok, message} ->
-          socket
-          |> stream_insert(:messages, message)
-          |> assign_message_form(Chat.change_message(%Message{}))
+        {:ok, _message} ->
+          assign_message_form(socket, Chat.change_message(%Message{}))
 
         {:error, changeset} ->
           assign_message_form(socket, changeset)
@@ -61,13 +63,20 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_event("delete-message", %{"id" => id}, socket) do
-    {:ok, message} = Chat.delete_message_by_id(id, socket.assigns.current_user)
-
-    {:noreply, stream_delete(socket, :messages, message)}
+    Chat.delete_message_by_id(id, socket.assigns.current_user)
+    {:noreply, socket}
   end
 
   def handle_event("toggle-topic", _params, socket) do
     {:noreply, update(socket, :hide_topic?, &(!&1))}
+  end
+
+  def handle_info({:new_message, message}, socket) do
+    {:noreply, stream_insert(socket, :messages, message)}
+  end
+
+  def handle_info({:message_deleted, message}, socket) do
+    {:noreply, stream_delete(socket, :messages, message)}
   end
 
   def render(assigns) do
@@ -205,11 +214,11 @@ defmodule SlapWeb.ChatRoomLive do
 
   defp message(assigns) do
     ~H"""
-    <div class="relative flex px-4 py-3">
+    <div id={@dom_id} class="group relative flex px-4 py-3">
       <div id={@dom_id} class="h-10 w-10 rounded shrink-0 bg-slate-300"></div>
       <button
         :if={@current_user.id == @message.user_id}
-        class="absolute top-4 right-4 text-red-500 hover:text-red-800 cursor-pointer"
+        class="absolute top-4 right-4 text-red-500 hover:text-red-800 cursor-pointer hidden group-hover:block"
         data-confirm="Are you Sure?"
         phx-click="delete-message"
         phx-value-id={@message.id}
