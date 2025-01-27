@@ -12,7 +12,7 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_params(params, _uri, socket) do
-    if socket.assigns[:room], do: Chat.unsubscribe_from_room(socket.assings.room)
+    if socket.assigns[:room], do: Chat.unsubscribe_from_room(socket.assigns.room)
 
     rooms = socket.assigns.rooms
 
@@ -34,7 +34,9 @@ defmodule SlapWeb.ChatRoomLive do
        messages: messages
      )
      |> stream(:messages, messages, reset: true)
-     |> assign_message_form(Chat.change_message(%Message{}))}
+     |> assign_message_form(Chat.change_message(%Message{}))
+     |> push_event("scroll_messages_to_bottom", %{})}
+
   end
 
   defp assign_message_form(socket, changeset) do
@@ -72,7 +74,12 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_info({:new_message, message}, socket) do
-    {:noreply, stream_insert(socket, :messages, message)}
+    socket =
+      socket
+      |> stream_insert(:messages, message)
+      |> push_event("scroll_messages_to_bottom", %{})
+
+    {:noreply, socket}
   end
 
   def handle_info({:message_deleted, message}, socket) do
@@ -150,7 +157,12 @@ defmodule SlapWeb.ChatRoomLive do
           </li>
         </ul>
       </div>
-      <div id="room-messages" class="flex flex-col grow overflow-auto" phx-update="stream">
+      <div
+        id="room-messages"
+        phx-hook="RoomMessages"
+        class="flex flex-col grow overflow-auto"
+        phx-update="stream"
+      >
         <.message
           :for={{dom_id, message} <- @streams.messages}
           timezone={@timezone}
@@ -174,6 +186,7 @@ defmodule SlapWeb.ChatRoomLive do
             name={@new_message_form[:body].name}
             placeholder={"Message ##{@room.name}"}
             phx-debounce
+            phx-hook="ChatMessageTextArea"
             rows="1"
           >{Phoenix.HTML.Form.normalize_value("textarea", @new_message_form[:body].value)}</textarea>
 
