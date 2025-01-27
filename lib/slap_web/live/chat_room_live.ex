@@ -12,7 +12,7 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_params(params, _uri, socket) do
-    if socket.assings[:room], do: Chat.unsubscribe_from_room(socket.assings.room)
+    if socket.assigns[:room], do: Chat.unsubscribe_from_room(socket.assings.room)
 
     rooms = socket.assigns.rooms
 

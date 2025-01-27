@@ -1,6 +1,6 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
-  alias Slap.Chat.{Message,Room}
+  alias Slap.Chat.{Message, Room}
   alias Slap.Repo
   import Ecto.Query
 
@@ -45,10 +45,13 @@ defmodule Slap.Chat do
   end
 
   def create_message(room, attrs, user) do
-    with {:ok, message} <- %Message{room: room, user: user}
-    |> Message.changeset(attrs)
-    |> Repo.insert() do
+    with {:ok, message} <-
+           %Message{room: room, user: user}
+           |> Message.changeset(attrs)
+           |> Repo.insert() do
       Phoenix.PubSub.broadcast!(@pubsub, topic(room.id), {:new_message, message})
+
+      {:ok, message}
     end
   end
 
