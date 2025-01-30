@@ -16,6 +16,7 @@ defmodule Slap.Application do
       {Finch, name: Slap.Finch},
       # Start a worker by calling: Slap.Worker.start_link(arg)
       # {Slap.Worker, arg},
+      SlapWeb.Presence,
       # Start to serve requests, typically the last entry
       SlapWeb.Endpoint
     ]
