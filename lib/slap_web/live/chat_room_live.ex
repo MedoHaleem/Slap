@@ -112,23 +112,46 @@ defmodule SlapWeb.ChatRoomLive do
       <div class="flex justify-between items-center shrink-0 h-16 border-b border-slate-300 px-4">
         <div class="flex flex-col gap-1.5">
           <h1 class="text-lg font-bold text-gray-800">
-            Slax
+            Slap
           </h1>
         </div>
       </div>
 
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3">
-          <span class="ml-2 leading-none font-medium text-sm">Rooms</span>
+          <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
         </div>
 
         <div id="rooms-list">
           <.room_link :for={room <- @rooms} room={room} active={room.id == @room.id} />
         </div>
+        <div class="relative">
+          <button
+            class="flex items-center peer h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full"
+            phx-click={JS.toggle(to: "#sidebar-rooms-menu")}
+          >
+            <.icon name="hero-plus" class="h-4 w-4 relative top-px" />
+            <span class="ml-2 leading-none">Add rooms</span>
+          </button>
+          <div
+            id="sidebar-rooms-menu"
+            class="hidden cursor-default absolute top-8 right-2 bg-white border-slate-200 border py-3 rounded-lg"
+            phx-click-away={JS.hide()}
+          >
+          </div>
+          <div class="w-full text-left">
+            <.link
+              class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
+              navigate={~p"/rooms"}
+            >
+              Browse rooms
+            </.link>
+          </div>
+        </div>
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
             <div class="flex items-center grow">
-              <span class="ml-2 leading-none font-medium text-sm">Users</span>
+              <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
             </div>
           </div>
           <div id="users-list">
@@ -231,6 +254,39 @@ defmodule SlapWeb.ChatRoomLive do
       </div>
     </div>
     """
+  end
+
+  attr :dom_id, :string, required: true
+  attr :text, :string, required: true
+  attr :on_click, JS, required: true
+
+  defp toggler(assigns) do
+    ~H"""
+    <button id={@dom_id} phx-click={@on_click} class="flex items-center grow">
+      <.icon id={@dom_id <> "-chevron-down"} name="hero-chevron-down" class="h-4 w-4" />
+      <.icon
+        id={@dom_id <> "-chevron-right"}
+        name="hero-chevron-right"
+        class="h-4 w-4"
+        style="display:none;"
+      />
+      <span class="ml-2 leading-none font-medium text-sm">
+        {@text}
+      </span>
+    </button>
+    """
+  end
+
+  defp toggle_rooms() do
+    JS.toggle(to: "#rooms-toggler-chevron-down")
+    |> JS.toggle(to: "#rooms-toggler-chevron-right")
+    |> JS.toggle(to: "#rooms-list")
+  end
+
+  defp toggle_users() do
+    JS.toggle(to: "#users-toggler-chevron-down")
+    |> JS.toggle(to: "#users-toggler-chevron-right")
+    |> JS.toggle(to: "#users-list")
   end
 
   attr :user, User, required: true

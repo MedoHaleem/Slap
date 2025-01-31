@@ -65,6 +65,7 @@ defmodule SlapWeb.Router do
     live_session :require_authenticated_user,
       on_mount: [{SlapWeb.UserAuth, :ensure_authenticated}] do
       live "/", ChatRoomLive
+      live "/rooms", ChatRoomLive.Index
       live "/rooms/:id", ChatRoomLive
       live "/rooms/:id/edit", ChatRoomLive.Edit
       live "/users/settings", UserSettingsLive, :edit
