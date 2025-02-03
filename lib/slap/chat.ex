@@ -1,6 +1,6 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
-  alias Slap.Chat.{Message, Room}
+  alias Slap.Chat.{Message, Room, RoomMembership}
   alias Slap.Repo
   import Ecto.Query
 
@@ -38,6 +38,10 @@ defmodule Slap.Chat do
     room
     |> Room.changeset(attrs)
     |> Repo.update()
+  end
+
+  def join_room!(room, user) do
+    Repo.insert!(%RoomMembership{room: room, user: user})
   end
 
   def change_message(message, attrs \\ %{}) do

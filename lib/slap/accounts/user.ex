@@ -2,12 +2,16 @@ defmodule Slap.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Slap.Chat.{Room, RoomMembership}
+
   schema "users" do
     field :email, :string
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
+
+    many_to_many :room, Room, join_through: RoomMembership
 
     timestamps(type: :utc_datetime)
   end
