@@ -2,6 +2,7 @@ defmodule Slap.Chat do
   alias Slap.Accounts.User
   alias Slap.Chat.{Message, Room, RoomMembership}
   alias Slap.Repo
+  import Ecto.Changeset
   import Ecto.Query
 
   @pubsub Slap.PubSub
@@ -49,6 +50,29 @@ defmodule Slap.Chat do
     )
   end
 
+  def update_last_read_id(room, user) do
+    case get_membership(room, user) do
+      %RoomMembership{} = membership ->
+        id = from(m in Message, where: m.room_id == ^room.id, select: max(m.id)) |> Repo.one()
+
+        membership
+        |> change(%{last_read_id: id})
+        |> Repo.update()
+
+        nil -> nil
+    end
+  end
+
+  def get_last_read_id(%Room{} = room, user) do
+    case get_membership(room, user) do
+      %RoomMembership{} = membership ->
+        membership.last_read_id
+
+      nil ->
+        nil
+    end
+  end
+
   def get_room!(id) do
     Repo.get!(Room, id)
   end
@@ -70,7 +94,7 @@ defmodule Slap.Chat do
   end
 
   def toggle_room_membership(room, user) do
-    case Repo.get_by(RoomMembership, room_id: room.id, user_id: user.id) do
+    case get_membership(room, user) do
       %RoomMembership{} = membership ->
         Repo.delete(membership)
         {room, false}
@@ -79,6 +103,10 @@ defmodule Slap.Chat do
         join_room!(room, user)
         {room, true}
     end
+  end
+
+  defp get_membership(room, user) do
+    Repo.get_by(RoomMembership, room_id: room.id, user_id: user.id)
   end
 
   def change_message(message, attrs \\ %{}) do
