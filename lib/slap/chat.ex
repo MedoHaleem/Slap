@@ -69,6 +69,18 @@ defmodule Slap.Chat do
     Repo.insert!(%RoomMembership{room: room, user: user})
   end
 
+  def toggle_room_membership(room, user) do
+    case Repo.get_by(RoomMembership, room_id: room.id, user_id: user.id) do
+      %RoomMembership{} = membership ->
+        Repo.delete(membership)
+        {room, false}
+
+      nil ->
+        join_room!(room, user)
+        {room, true}
+    end
+  end
+
   def change_message(message, attrs \\ %{}) do
     Message.changeset(message, attrs)
   end
