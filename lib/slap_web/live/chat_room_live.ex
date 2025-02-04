@@ -8,7 +8,7 @@ defmodule SlapWeb.ChatRoomLive do
 
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
-    rooms = Chat.list_rooms()
+    rooms = Chat.list_joined_rooms(socket.assigns.current_user)
     timezone = get_connect_params(socket)["timezone"]
 
     if connected?(socket) do
@@ -29,12 +29,12 @@ defmodule SlapWeb.ChatRoomLive do
   def handle_params(params, _uri, socket) do
     if socket.assigns[:room], do: Chat.unsubscribe_from_room(socket.assigns.room)
 
-    rooms = socket.assigns.rooms
+    rooms = Chat.list_rooms()
 
     room =
       case Map.fetch(params, "id") do
         {:ok, id} -> %Room{} = Enum.find(rooms, &(to_string(&1.id) == id))
-        :error -> List.first(rooms)
+        :error ->  Chat.get_first_room!()
       end
 
     messages = Chat.list_messages_in_room(room)
@@ -44,6 +44,7 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply,
      assign(socket,
        hide_topic?: false,
+       joined?: Chat.joined?(room, socket.assigns.current_user),
        room: room,
        page_title: "#" <> room.name,
        messages: messages
@@ -60,14 +61,18 @@ defmodule SlapWeb.ChatRoomLive do
   def handle_event("submit-message", %{"message" => message_params}, socket) do
     %{current_user: current_user, room: room} = socket.assigns
 
-    socket =
-      case Chat.create_message(room, message_params, current_user) do
-        {:ok, _message} ->
-          assign_message_form(socket, Chat.change_message(%Message{}))
+    if Chat.joined?(room, current_user) do
+      socket =
+        case Chat.create_message(room, message_params, current_user) do
+          {:ok, _message} ->
+            assign_message_form(socket, Chat.change_message(%Message{}))
 
-        {:error, changeset} ->
-          assign_message_form(socket, changeset)
-      end
+          {:error, changeset} ->
+            assign_message_form(socket, changeset)
+        end
+    else
+      socket
+    end
 
     {:noreply, socket}
   end
@@ -124,29 +129,22 @@ defmodule SlapWeb.ChatRoomLive do
 
         <div id="rooms-list">
           <.room_link :for={room <- @rooms} room={room} active={room.id == @room.id} />
-        </div>
-        <div class="relative">
-          <button
-            class="flex items-center peer h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full"
-            phx-click={JS.toggle(to: "#sidebar-rooms-menu")}
-          >
+          <button class="group relative flex items-center h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full">
             <.icon name="hero-plus" class="h-4 w-4 relative top-px" />
             <span class="ml-2 leading-none">Add rooms</span>
+            <div class="hidden group-focus:block cursor-default absolute top-8 right-2 bg-white border-slate-200 border py-3 rounded-lg">
+              <div class="w-full text-left">
+                <div class="hover:bg-sky-600">
+                  <div
+                    phx-click={JS.navigate(~p"/rooms")}
+                    class="cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1"
+                  >
+                    Browse rooms
+                  </div>
+                </div>
+              </div>
+            </div>
           </button>
-          <div
-            id="sidebar-rooms-menu"
-            class="hidden cursor-default absolute top-8 right-2 bg-white border-slate-200 border py-3 rounded-lg"
-            phx-click-away={JS.hide()}
-          >
-          </div>
-          <div class="w-full text-left">
-            <.link
-              class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
-              navigate={~p"/rooms"}
-            >
-              Browse rooms
-            </.link>
-          </div>
         </div>
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
@@ -171,6 +169,7 @@ defmodule SlapWeb.ChatRoomLive do
             #{@room.name}
 
             <.link
+              :if={@joined?}
               class="font-normal text-xs text-blue-600 hover:text-blue-700"
               navigate={~p"/rooms/#{@room}/edit"}
             >
@@ -228,7 +227,7 @@ defmodule SlapWeb.ChatRoomLive do
           current_user={@current_user}
         />
       </div>
-      <div class="h-12 bg-white px-4 pb-4">
+      <div :if={@joined?} class="h-12 bg-white px-4 pb-4">
         <.form
           id="new-message-form"
           for={@new_message_form}
@@ -252,8 +251,44 @@ defmodule SlapWeb.ChatRoomLive do
           </button>
         </.form>
       </div>
+      <div
+        :if={!@joined?}
+        class="flex justify-around mx-5 mb-5 p-6 bg-slate-100 border-slate-300 border rounded-lg"
+      >
+        <div class="max-w-3-xl text-center">
+          <div class="mb-4">
+            <h1 class="text-xl font-semibold">#{@room.name}</h1>
+            <p :if={@room.topic} class="text-sm mt-1 text-gray-600">{@room.topic}</p>
+          </div>
+          <div class="flex items-center justify-around">
+            <button
+              phx-click="join-room"
+              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              Join Room
+            </button>
+          </div>
+          <div class="mt-4">
+            <.link
+              navigate={~p"/rooms"}
+              href="#"
+              class="text-sm text-slate-500 underline hover:text-slate-600"
+            >
+              Back to All Rooms
+            </.link>
+          </div>
+        </div>
+      </div>
     </div>
     """
+  end
+
+  def handle_event("join-room", _, socket) do
+    current_user = socket.assigns.current_user
+    Chat.join_room!(socket.assigns.room, current_user)
+    Chat.subscribe_to_room(socket.assigns.room)
+    socket = assign(socket, joined?: true, rooms: Chat.list_joined_rooms(current_user))
+    {:noreply, socket}
   end
 
   attr :dom_id, :string, required: true

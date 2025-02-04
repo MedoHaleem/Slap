@@ -11,7 +11,7 @@ defmodule Slap.Accounts.User do
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
 
-    many_to_many :room, Room, join_through: RoomMembership
+    many_to_many :rooms, Room, join_through: RoomMembership
 
     timestamps(type: :utc_datetime)
   end

@@ -20,8 +20,33 @@ defmodule Slap.Chat do
     Room.changeset(room, attrs)
   end
 
+  def get_first_room! do
+    Repo.one!(from r in Room, limit: 1, order_by: [asc: :name])
+  end
+
   def list_rooms do
     Repo.all(from Room, order_by: [asc: :name])
+  end
+
+  def list_joined_rooms(%User{} = user) do
+    user |> Repo.preload(:rooms) |> Map.fetch!(:rooms) |> Enum.sort_by(& &1.name)
+  end
+
+  def list_rooms_with_joined(%User{} = user) do
+    query =
+      from r in Room,
+        left_join: m in RoomMembership,
+        on: r.id == m.room_id and m.user_id == ^user.id,
+        select: {r, not is_nil(m.id)},
+        order_by: [asc: :name]
+
+    Repo.all(query)
+  end
+
+  def joined?(%Room{} = room, %User{} = user) do
+    Repo.exists?(
+      from rm in RoomMembership, where: rm.room_id == ^room.id and rm.user_id == ^user.id
+    )
   end
 
   def get_room!(id) do

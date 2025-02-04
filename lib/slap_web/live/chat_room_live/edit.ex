@@ -34,14 +34,17 @@ defmodule SlapWeb.ChatRoomLive.Edit do
 
   def mount(%{"id" => id}, _session, socket) do
     room = Chat.get_room!(id)
-    changeset = Chat.change_room(room)
+    if Chat.joined?(room, socket.assigns.current_user) do
+      changeset = Chat.change_room(room)
 
-    socket =
-      assign(socket,
-        room: room,
-        page_title: "Edit Chat Room",
-        form: to_form(changeset)
-      )
+      socket
+      |> assign(page_title: "Edit chat room", room: room)
+      |> assign_form(changeset)
+    else
+      socket
+      |> put_flash(:error, "Permission denied")
+      |> push_navigate(to: ~p"/")
+    end
 
     {:ok, socket}
   end
