@@ -8,7 +8,7 @@ defmodule SlapWeb.ChatRoomLive do
 
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
-    rooms = Chat.list_joined_rooms(socket.assigns.current_user)
+    rooms = Chat.list_joined_rooms_with_unread_counts(socket.assigns.current_user)
     timezone = get_connect_params(socket)["timezone"]
 
     if connected?(socket) do
@@ -16,6 +16,8 @@ defmodule SlapWeb.ChatRoomLive do
     end
 
     OnlineUsers.subscribe()
+
+    Enum.each(rooms, fn {chat, _} -> Chat.subscribe_to_room(chat) end)
 
     socket =
       socket
@@ -32,14 +34,14 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_params(params, _uri, socket) do
-    if socket.assigns[:room], do: Chat.unsubscribe_from_room(socket.assigns.room)
-
-    rooms = Chat.list_rooms()
-
+    rooms = socket.assigns.rooms
     room =
       case Map.fetch(params, "id") do
-        {:ok, id} -> %Room{} = Enum.find(rooms, &(to_string(&1.id) == id))
-        :error -> Chat.get_first_room!()
+        {:ok, id} ->
+          Chat.get_room!(id)
+
+        :error ->
+          Chat.get_first_room!()
       end
 
     last_read_id = Chat.get_last_read_id(room, socket.assigns.current_user)
@@ -49,21 +51,29 @@ defmodule SlapWeb.ChatRoomLive do
       |> Chat.list_messages_in_room()
       |> insert_unread_marker(last_read_id)
 
-    Chat.subscribe_to_room(room)
-
     Chat.update_last_read_id(room, socket.assigns.current_user)
 
-    {:noreply,
-     assign(socket,
-       hide_topic?: false,
-       joined?: Chat.joined?(room, socket.assigns.current_user),
-       room: room,
-       page_title: "#" <> room.name,
-       messages: messages
-     )
-     |> stream(:messages, messages, reset: true)
-     |> assign_message_form(Chat.change_message(%Message{}))
-     |> push_event("scroll_messages_to_bottom", %{})}
+    socket =
+      assign(socket,
+        hide_topic?: false,
+        joined?: Chat.joined?(room, socket.assigns.current_user),
+        room: room,
+        page_title: "#" <> room.name,
+        messages: messages
+      )
+      |> stream(:messages, messages, reset: true)
+      |> assign_message_form(Chat.change_message(%Message{}))
+      |> push_event("scroll_messages_to_bottom", %{})
+      |> update(:rooms, fn rooms ->
+        room_id = room.id
+
+        Enum.map(rooms, fn
+          {%Room{id: ^room_id} = room, _} -> {room, 0}
+          other -> other
+        end)
+      end)
+
+    {:noreply, socket}
   end
 
   defp insert_unread_marker(messages, nil), do: messages
@@ -117,16 +127,30 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_info({:new_message, message}, socket) do
-    if message.room_id == socket.assigns.room.id do
-      Chat.update_last_read_id(message.room, socket.assigns.current_user)
+    room = socket.assigns.room
+
+  socket =
+    cond do
+      message.room_id == room.id ->
+        Chat.update_last_read_id(room, socket.assigns.current_user)
+
+        socket
+        |> stream_insert(:messages, message)
+        |> push_event("scroll_messages_to_bottom", %{})
+
+      message.user_id != socket.assigns.current_user.id ->
+        update(socket, :rooms, fn rooms ->
+          Enum.map(rooms, fn
+            {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
+            other -> other
+          end)
+        end)
+
+      true ->
+        socket
     end
 
-    socket =
-      socket
-      |> stream_insert(:messages, message)
-      |> push_event("scroll_messages_to_bottom", %{})
-
-    {:noreply, socket}
+   {:noreply, socket}
   end
 
   def handle_info({:message_deleted, message}, socket) do
@@ -137,6 +161,20 @@ defmodule SlapWeb.ChatRoomLive do
     online_users = OnlineUsers.update(socket.assigns.online_users, diff)
 
     {:noreply, assign(socket, online_users: online_users)}
+  end
+
+  def handle_event("join-room", _, socket) do
+    current_user = socket.assigns.current_user
+    Chat.join_room!(socket.assigns.room, current_user)
+    Chat.subscribe_to_room(socket.assigns.room)
+
+    socket =
+      assign(socket,
+        joined?: true,
+        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
+      )
+
+    {:noreply, socket}
   end
 
   def render(assigns) do
@@ -156,7 +194,12 @@ defmodule SlapWeb.ChatRoomLive do
         </div>
 
         <div id="rooms-list">
-          <.room_link :for={room <- @rooms} room={room} active={room.id == @room.id} />
+          <.room_link
+            :for={{room, unread_count} <- @rooms}
+            room={room}
+            active={room.id == @room.id}
+            unread_count={unread_count}
+          />
           <button class="group relative flex items-center h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full">
             <.icon name="hero-plus" class="h-4 w-4 relative top-px" />
             <span class="ml-2 leading-none">Add rooms</span>
@@ -319,14 +362,6 @@ defmodule SlapWeb.ChatRoomLive do
     """
   end
 
-  def handle_event("join-room", _, socket) do
-    current_user = socket.assigns.current_user
-    Chat.join_room!(socket.assigns.room, current_user)
-    Chat.subscribe_to_room(socket.assigns.room)
-    socket = assign(socket, joined?: true, rooms: Chat.list_joined_rooms(current_user))
-    {:noreply, socket}
-  end
-
   attr :dom_id, :string, required: true
   attr :text, :string, required: true
   attr :on_click, JS, required: true
@@ -380,6 +415,7 @@ defmodule SlapWeb.ChatRoomLive do
 
   attr :active, :boolean, required: true
   attr :room, Room, required: true
+  attr :unread_count, :integer, required: true
 
   defp room_link(assigns) do
     ~H"""
@@ -395,6 +431,7 @@ defmodule SlapWeb.ChatRoomLive do
       <span class={["ml-2 leading-none", @active && "font-bold"]}>
         {@room.name}
       </span>
+      <.unread_message_counter count={@unread_count} />
     </.link>
     """
   end
@@ -417,6 +454,7 @@ defmodule SlapWeb.ChatRoomLive do
       >
         <.icon name="hero-trash" class="h-4 w-4" />
       </button>
+      <img class="h-10 w-10 rounded shrink-0" src={~p"/images/one_ring.jpg"} />
       <div class="ml-2">
         <div class="-mt-1">
           <.link class="text-sm font-semibold hover:underline">
@@ -440,5 +478,18 @@ defmodule SlapWeb.ChatRoomLive do
 
   defp username(user) do
     user.email |> String.split("@") |> List.first() |> String.capitalize()
+  end
+
+  attr :count, :integer, required: true
+
+  defp unread_message_counter(assigns) do
+    ~H"""
+    <span
+      :if={@count > 0}
+      class="flex items-center justify-center bg-blue-500 rounded-full font-medium h-5 px-2 ml-auto text-xs text-white"
+    >
+      {@count}
+    </span>
+    """
   end
 end
