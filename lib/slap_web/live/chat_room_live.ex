@@ -23,6 +23,7 @@ defmodule SlapWeb.ChatRoomLive do
       socket
       |> assign(rooms: rooms, timezone: timezone, users: users)
       |> assign(online_users: OnlineUsers.list())
+      |> assign_room_form(Chat.change_room(%Room{}))
       |> stream_configure(:messages,
         dom_id: fn
           %Message{id: id} -> "messages-#{id}"
@@ -33,8 +34,13 @@ defmodule SlapWeb.ChatRoomLive do
     {:ok, socket}
   end
 
+  defp assign_room_form(socket, changeset) do
+    assign(socket, :new_room_form, to_form(changeset))
+  end
+
   def handle_params(params, _uri, socket) do
     rooms = socket.assigns.rooms
+
     room =
       case Map.fetch(params, "id") do
         {:ok, id} ->
@@ -129,28 +135,28 @@ defmodule SlapWeb.ChatRoomLive do
   def handle_info({:new_message, message}, socket) do
     room = socket.assigns.room
 
-  socket =
-    cond do
-      message.room_id == room.id ->
-        Chat.update_last_read_id(room, socket.assigns.current_user)
+    socket =
+      cond do
+        message.room_id == room.id ->
+          Chat.update_last_read_id(room, socket.assigns.current_user)
 
-        socket
-        |> stream_insert(:messages, message)
-        |> push_event("scroll_messages_to_bottom", %{})
+          socket
+          |> stream_insert(:messages, message)
+          |> push_event("scroll_messages_to_bottom", %{})
 
-      message.user_id != socket.assigns.current_user.id ->
-        update(socket, :rooms, fn rooms ->
-          Enum.map(rooms, fn
-            {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
-            other -> other
+        message.user_id != socket.assigns.current_user.id ->
+          update(socket, :rooms, fn rooms ->
+            Enum.map(rooms, fn
+              {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
+              other -> other
+            end)
           end)
-        end)
 
-      true ->
-        socket
-    end
+        true ->
+          socket
+      end
 
-   {:noreply, socket}
+    {:noreply, socket}
   end
 
   def handle_info({:message_deleted, message}, socket) do
@@ -175,6 +181,19 @@ defmodule SlapWeb.ChatRoomLive do
       )
 
     {:noreply, socket}
+  end
+
+  def handle_event("save-room", %{"room" => room_params}, socket) do
+    case Chat.create_room(room_params) do
+      {:ok, room} ->
+        Chat.join_room!(room, socket.assigns.current_user)
+
+        {:noreply,
+         socket |> put_flash(:info, "Created room") |> push_navigate(to: ~p"/rooms/#{room}")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign_room_form(socket, changeset)}
+    end
   end
 
   def render(assigns) do
@@ -211,6 +230,12 @@ defmodule SlapWeb.ChatRoomLive do
                     class="cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1"
                   >
                     Browse rooms
+                  </div>
+                  <div
+                    phx-click={show_modal("new-room-modal")}
+                    class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
+                  >
+                    Create a new room
                   </div>
                 </div>
               </div>
@@ -359,7 +384,32 @@ defmodule SlapWeb.ChatRoomLive do
         </div>
       </div>
     </div>
+
+    <.modal id="new-room-modal">
+      <.header>New chat room</.header>
+      <.simple_form
+        for={@new_room_form}
+        id="room-form"
+        phx-change="validate-room"
+        phx-submit="save-room"
+      >
+        <.input field={@new_room_form[:name]} type="text" label="Name" phx-debounce />
+        <.input field={@new_room_form[:topic]} type="text" label="Topic" phx-debounce />
+        <:actions>
+          <.button phx-disable-with="Saving..." class="w-full">Save</.button>
+        </:actions>
+      </.simple_form>
+    </.modal>
     """
+  end
+
+  def handle_event("validate-room", %{"room" => room_params}, socket) do
+    changeset =
+      socket.assigns.room
+      |> Chat.change_room(room_params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign_room_form(socket, changeset)}
   end
 
   attr :dom_id, :string, required: true
@@ -444,7 +494,6 @@ defmodule SlapWeb.ChatRoomLive do
   defp message(assigns) do
     ~H"""
     <div id={@dom_id} class="group relative flex px-4 py-3">
-      <div id={@dom_id} class="h-10 w-10 rounded shrink-0 bg-slate-300"></div>
       <button
         :if={@current_user.id == @message.user_id}
         class="absolute top-4 right-4 text-red-500 hover:text-red-800 cursor-pointer hidden group-hover:block"
