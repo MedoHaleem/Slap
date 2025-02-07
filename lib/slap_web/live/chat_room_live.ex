@@ -4,6 +4,9 @@ defmodule SlapWeb.ChatRoomLive do
   alias Slap.Accounts
   alias Slap.Accounts.User
   alias SlapWeb.OnlineUsers
+
+  import SlapWeb.RoomComponents
+
   use SlapWeb, :live_view
 
   def mount(_params, _session, socket) do
@@ -232,7 +235,7 @@ defmodule SlapWeb.ChatRoomLive do
                     Browse rooms
                   </div>
                   <div
-                    phx-click={show_modal("new-room-modal")}
+                    phx-click={JS.navigate(~p"/rooms/#{@room}/new") |> show_modal("new-room-modal")}
                     class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
                   >
                     Create a new room
@@ -385,20 +388,9 @@ defmodule SlapWeb.ChatRoomLive do
       </div>
     </div>
 
-    <.modal id="new-room-modal">
+    <.modal id="new-room-modal" show={@live_action == :new} on_cancel={JS.navigate(~p"/rooms/#{@room}")}>
       <.header>New chat room</.header>
-      <.simple_form
-        for={@new_room_form}
-        id="room-form"
-        phx-change="validate-room"
-        phx-submit="save-room"
-      >
-        <.input field={@new_room_form[:name]} type="text" label="Name" phx-debounce />
-        <.input field={@new_room_form[:topic]} type="text" label="Topic" phx-debounce />
-        <:actions>
-          <.button phx-disable-with="Saving..." class="w-full">Save</.button>
-        </:actions>
-      </.simple_form>
+      <.room_form form={@new_room_form} />
     </.modal>
     """
   end

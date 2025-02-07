@@ -1,5 +1,6 @@
 defmodule SlapWeb.ChatRoomLive.Edit do
   use SlapWeb, :live_view
+  import SlapWeb.RoomComponents
 
   alias Slap.Chat
 
@@ -19,24 +20,15 @@ defmodule SlapWeb.ChatRoomLive.Edit do
         </:actions>
       </.header>
 
-      <.simple_form for={@form} id="room-form" phx-change="validate-room" phx-submit="save-room">
-        <.input field={@form[:name]} type="text" label="Name" phx-debounce />
-
-        <.input field={@form[:topic]} type="text" label="Topic" phx-debounce />
-
-        <:actions>
-          <.button phx-disable-with="Saving..." class="w-full">Save</.button>
-        </:actions>
-      </.simple_form>
+      <.room_form form={@form} />
     </div>
     """
   end
 
   def mount(%{"id" => id}, _session, socket) do
     room = Chat.get_room!(id)
-    if Chat.joined?(room, socket.assigns.current_user) do
+    socket = if Chat.joined?(room, socket.assigns.current_user) do
       changeset = Chat.change_room(room)
-
       socket
       |> assign(page_title: "Edit chat room", room: room)
       |> assign_form(changeset)
@@ -46,6 +38,7 @@ defmodule SlapWeb.ChatRoomLive.Edit do
       |> push_navigate(to: ~p"/")
     end
 
+    IO.inspect socket.assigns.form
     {:ok, socket}
   end
 
@@ -60,7 +53,9 @@ defmodule SlapWeb.ChatRoomLive.Edit do
     case Chat.update_room(socket.assigns.room, room_params) do
       {:ok, room} ->
         {:noreply,
-         socket |> put_flash(:info, "Room updated Successfully") |> push_navigate(to: ~p"/rooms/#{room}")}
+         socket
+         |> put_flash(:info, "Room updated Successfully")
+         |> push_navigate(to: ~p"/rooms/#{room}")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
