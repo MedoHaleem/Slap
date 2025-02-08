@@ -55,6 +55,8 @@ defmodule SlapWeb do
       use Phoenix.LiveView,
         layout: {SlapWeb.Layouts, :app}
 
+        import SlapWeb.SocketHelpers
+
       unquote(html_helpers())
     end
   end

@@ -22,19 +22,17 @@ defmodule SlapWeb.ChatRoomLive do
 
     Enum.each(rooms, fn {chat, _} -> Chat.subscribe_to_room(chat) end)
 
-    socket =
-      socket
-      |> assign(rooms: rooms, timezone: timezone, users: users)
-      |> assign(online_users: OnlineUsers.list())
-      |> assign_room_form(Chat.change_room(%Room{}))
-      |> stream_configure(:messages,
-        dom_id: fn
-          %Message{id: id} -> "messages-#{id}"
-          :unread_marker -> "messages-unread-marker"
-        end
-      )
-
-    {:ok, socket}
+    socket
+    |> assign(rooms: rooms, timezone: timezone, users: users)
+    |> assign(online_users: OnlineUsers.list())
+    |> assign_room_form(Chat.change_room(%Room{}))
+    |> stream_configure(:messages,
+      dom_id: fn
+        %Message{id: id} -> "messages-#{id}"
+        :unread_marker -> "messages-unread-marker"
+      end
+    )
+    |> ok()
   end
 
   defp assign_room_form(socket, changeset) do
@@ -62,27 +60,26 @@ defmodule SlapWeb.ChatRoomLive do
 
     Chat.update_last_read_id(room, socket.assigns.current_user)
 
-    socket =
-      assign(socket,
-        hide_topic?: false,
-        joined?: Chat.joined?(room, socket.assigns.current_user),
-        room: room,
-        page_title: "#" <> room.name,
-        messages: messages
-      )
-      |> stream(:messages, messages, reset: true)
-      |> assign_message_form(Chat.change_message(%Message{}))
-      |> push_event("scroll_messages_to_bottom", %{})
-      |> update(:rooms, fn rooms ->
-        room_id = room.id
+    socket
+    |> assign(
+      hide_topic?: false,
+      joined?: Chat.joined?(room, socket.assigns.current_user),
+      room: room,
+      page_title: "#" <> room.name,
+      messages: messages
+    )
+    |> stream(:messages, messages, reset: true)
+    |> assign_message_form(Chat.change_message(%Message{}))
+    |> push_event("scroll_messages_to_bottom", %{})
+    |> update(:rooms, fn rooms ->
+      room_id = room.id
 
-        Enum.map(rooms, fn
-          {%Room{id: ^room_id} = room, _} -> {room, 0}
-          other -> other
-        end)
+      Enum.map(rooms, fn
+        {%Room{id: ^room_id} = room, _} -> {room, 0}
+        other -> other
       end)
-
-    {:noreply, socket}
+    end)
+    |> noreply()
   end
 
   defp insert_unread_marker(messages, nil), do: messages
@@ -388,7 +385,11 @@ defmodule SlapWeb.ChatRoomLive do
       </div>
     </div>
 
-    <.modal id="new-room-modal" show={@live_action == :new} on_cancel={JS.navigate(~p"/rooms/#{@room}")}>
+    <.modal
+      id="new-room-modal"
+      show={@live_action == :new}
+      on_cancel={JS.navigate(~p"/rooms/#{@room}")}
+    >
       <.header>New chat room</.header>
       <.room_form form={@new_room_form} />
     </.modal>
