@@ -42,9 +42,13 @@ defmodule Slap.Accounts do
       nil
 
   """
-  def get_user_by_email_and_password(email, password)
-      when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: email)
+  def get_authenticated_user(email_or_username, password)
+      when is_binary(email_or_username) and is_binary(password) do
+    user =
+      User
+      |> where([u], u.email == ^email_or_username or u.username == ^email_or_username)
+      |> Repo.one()
+
     if User.valid_password?(user, password), do: user
   end
 
@@ -94,7 +98,11 @@ defmodule Slap.Accounts do
 
   """
   def change_user_registration(%User{} = user, attrs \\ %{}) do
-    User.registration_changeset(user, attrs, hash_password: false, validate_email: false, validate_username: false)
+    User.registration_changeset(user, attrs,
+      hash_password: false,
+      validate_email: false,
+      validate_username: false
+    )
   end
 
   ## Settings
