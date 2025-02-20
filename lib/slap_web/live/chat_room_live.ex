@@ -144,6 +144,29 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply, update(socket, :hide_topic?, &(!&1))}
   end
 
+  def handle_event("show-profile", %{"user-id" => user_id}, socket) do
+    user = Accounts.get_user!(user_id)
+    {:noreply, assign(socket, :profile, user)}
+  end
+
+  def handle_event("close-profile", _, socket) do
+    {:noreply, assign(socket, :profile, nil)}
+  end
+
+  def handle_event("join-room", _, socket) do
+    current_user = socket.assigns.current_user
+    Chat.join_room!(socket.assigns.room, current_user)
+    Chat.subscribe_to_room(socket.assigns.room)
+
+    socket =
+      assign(socket,
+        joined?: true,
+        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
+      )
+
+    {:noreply, socket}
+  end
+
   def handle_info({:new_message, message}, socket) do
     room = socket.assigns.room
 
@@ -179,20 +202,6 @@ defmodule SlapWeb.ChatRoomLive do
     online_users = OnlineUsers.update(socket.assigns.online_users, diff)
 
     {:noreply, assign(socket, online_users: online_users)}
-  end
-
-  def handle_event("join-room", _, socket) do
-    current_user = socket.assigns.current_user
-    Chat.join_room!(socket.assigns.room, current_user)
-    Chat.subscribe_to_room(socket.assigns.room)
-
-    socket =
-      assign(socket,
-        joined?: true,
-        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
-      )
-
-    {:noreply, socket}
   end
 
   def render(assigns) do
@@ -285,7 +294,16 @@ defmodule SlapWeb.ChatRoomLive do
         </div>
         <ul class="relative z-10 flex items-center gap-4 px-4 sm:px-6 lg:px-8 justify-end">
           <li class="text-[0.8125rem] leading-6 text-zinc-900">
-            {@current_user.username}
+            <div class="text-sm leading-10">
+              <.link
+                class="flex gap-4 items-center"
+                phx-click="show-profile"
+                phx-value-user-id={@current_user.id}
+              >
+                <img src={~p"/images/one_ring.jpg"} class="h-8 w-8 rounded" />
+                <span class="hover:underline">{@current_user.username}</span>
+              </.link>
+            </div>
           </li>
 
           <li>
@@ -391,6 +409,10 @@ defmodule SlapWeb.ChatRoomLive do
         </div>
       </div>
     </div>
+
+    <%= if assigns[:profile] do %>
+      <.live_component id="profile" module={SlapWeb.ChatRoomLive.ProfileComponent} user={@profile} />
+    <% end %>
 
     <.modal
       id="new-room-modal"
@@ -523,10 +545,19 @@ defmodule SlapWeb.ChatRoomLive do
       >
         <.icon name="hero-trash" class="h-4 w-4" />
       </button>
-      <img class="h-10 w-10 rounded shrink-0" src={~p"/images/one_ring.jpg"} />
+      <img
+        class="h-10 w-10 rounded cursor-pointer"
+        phx-click="show-profile"
+        phx-value-user-id={@message.user.id}
+        src={~p"/images/one_ring.jpg"}
+      />
       <div class="ml-2">
         <div class="-mt-1">
-          <.link class="text-sm font-semibold hover:underline">
+          <.link
+            phx-click="show-profile"
+            phx-value-user-id={@message.user.id}
+            class="text-sm font-semibold hover:underline"
+          >
             <span>{@message.user.username}</span>
           </.link>
           <span :if={@timezone} class="ml-1 text-xs text-gray-500">
