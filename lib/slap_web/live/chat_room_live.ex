@@ -25,18 +25,14 @@ defmodule SlapWeb.ChatRoomLive do
     socket
     |> assign(rooms: rooms, timezone: timezone, users: users)
     |> assign(online_users: OnlineUsers.list())
-    |> assign_room_form(Chat.change_room(%Room{}))
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
         :unread_marker -> "messages-unread-marker"
+        %Date{} = date -> to_string(date)
       end
     )
     |> ok()
-  end
-
-  defp assign_room_form(socket, changeset) do
-    assign(socket, :new_room_form, to_form(changeset))
   end
 
   def handle_params(params, _uri, socket) do
@@ -56,6 +52,7 @@ defmodule SlapWeb.ChatRoomLive do
     messages =
       room
       |> Chat.list_messages_in_room()
+      |> insert_date_dividers(socket.assigns.timezone)
       |> insert_unread_marker(last_read_id)
 
     Chat.update_last_read_id(room, socket.assigns.current_user)
@@ -82,10 +79,25 @@ defmodule SlapWeb.ChatRoomLive do
     |> noreply()
   end
 
+  defp insert_date_dividers(messages, nil), do: messages
+
+  defp insert_date_dividers(messages, timezone) do
+    messages
+    |> Enum.group_by(fn message ->
+      message.inserted_at |> DateTime.shift_zone!(timezone) |> DateTime.to_date()
+    end)
+    |> Enum.sort_by(fn {date, _msg} -> date end, &(Date.compare(&1, &2) != :gt))
+    |> Enum.flat_map(fn {date, messages} -> [date | messages] end)
+  end
+
   defp insert_unread_marker(messages, nil), do: messages
 
   defp insert_unread_marker(messages, last_read_id) do
-    {read, unread} = Enum.split_while(messages, &(&1.id <= last_read_id))
+    {read, unread} =
+      Enum.split_while(messages, fn
+        %Message{} = message -> message.id <= last_read_id
+        _ -> true
+      end)
 
     if unread == [] do
       read
@@ -181,19 +193,6 @@ defmodule SlapWeb.ChatRoomLive do
       )
 
     {:noreply, socket}
-  end
-
-  def handle_event("save-room", %{"room" => room_params}, socket) do
-    case Chat.create_room(room_params) do
-      {:ok, room} ->
-        Chat.join_room!(room, socket.assigns.current_user)
-
-        {:noreply,
-         socket |> put_flash(:info, "Created room") |> push_navigate(to: ~p"/rooms/#{room}")}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign_room_form(socket, changeset)}
-    end
   end
 
   def render(assigns) do
@@ -316,18 +315,26 @@ defmodule SlapWeb.ChatRoomLive do
         phx-update="stream"
       >
         <%= for {dom_id, message} <- @streams.messages do %>
-          <%= if message == :unread_marker do %>
-            <div id={dom_id} class="w-full flex text-red-500 items-center gap-3 pr-5">
-              <div class="w-full h-px grow bg-red-500"></div>
-              <div class="text-sm">New</div>
-            </div>
-          <% else %>
-            <.message
-              current_user={@current_user}
-              dom_id={dom_id}
-              message={message}
-              timezone={@timezone}
-            />
+          <%= case message do %>
+            <% :unread_marker -> %>
+              <div id={dom_id} class="w-full flex text-red-500 items-center gap-3 pr-5">
+                <div class="w-full h-px grow bg-red-500"></div>
+                <div class="text-sm">New</div>
+              </div>
+            <% %Message{} -> %>
+              <.message
+                current_user={@current_user}
+                dom_id={dom_id}
+                message={message}
+                timezone={@timezone}
+              />
+            <% %Date{} -> %>
+              <div id={dom_id} class="flex flex-col items-center mt-2">
+                <hr class="w-full" />
+                <span class="flex items-center justify-center -mt-3 bg-white h-6 px-3 rounded-full border text-xs font-semibold mx-auto">
+                  {format_date(message)}
+                </span>
+              </div>
           <% end %>
         <% end %>
       </div>
@@ -391,18 +398,38 @@ defmodule SlapWeb.ChatRoomLive do
       on_cancel={JS.navigate(~p"/rooms/#{@room}")}
     >
       <.header>New chat room</.header>
-      <.room_form form={@new_room_form} />
+      <.live_component
+        module={SlapWeb.ChatRoomLive.FormComponent}
+        id="new-room-form-component"
+        current_user={@current_user}
+      />
     </.modal>
     """
   end
 
-  def handle_event("validate-room", %{"room" => room_params}, socket) do
-    changeset =
-      socket.assigns.room
-      |> Chat.change_room(room_params)
-      |> Map.put(:action, :validate)
+  defp format_date(%Date{} = date) do
+    today = Date.utc_today()
 
-    {:noreply, assign_room_form(socket, changeset)}
+    case Date.diff(today, date) do
+      0 ->
+        "Today"
+
+      1 ->
+        "Yesterday"
+
+      _ ->
+        format_str = "%A, %B %e#{ordinal(date.day)}#{if today.year != date.year, do: " %Y"}"
+        Timex.format!(date, format_str, :strftime)
+    end
+  end
+
+  defp ordinal(day) do
+    cond do
+      rem(day, 10) == 1 and day != 11 -> "st"
+      rem(day, 10) == 2 and day != 12 -> "nd"
+      rem(day, 10) == 3 and day != 13 -> "rd"
+      true -> "th"
+    end
   end
 
   attr :dom_id, :string, required: true

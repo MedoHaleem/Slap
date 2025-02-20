@@ -29,11 +29,15 @@ const hooks = {
   ChatMessageTextArea
 }
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const dateTimeFormat = new Intl.DateTimeFormat();
+const resolvedOptions = dateTimeFormat.resolvedOptions();
+
+console.log("Locale-based Time Zone:", resolvedOptions.timeZone);
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks,
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken,
-    timezone: Intl.DateTimeFormat().resolvedOptions.timezone
+    timezone: resolvedOptions.timeZone
   }
 })
 

@@ -1,11 +1,19 @@
 defmodule SlapWeb.ChatRoomLive.Index do
   use SlapWeb, :live_view
+  alias Slap.Chat.Room
   alias Slap.Chat
 
   def render(assigns) do
     ~H"""
     <main class="flex-1 p-6 max-w-4xl mx-auto">
-      <div class="mb-4">
+      <div class="flex justify-between mb-4 items-center">
+        <h1 class="text-xl font-semibold">{@page_title}</h1>
+        <button
+          phx-click={show_modal("new-room-modal")}
+          class="bg-white font-semibold py-2 px-4 border border-slate-400 rounded shadow-sm"
+        >
+          Create room
+        </button>
         <h1 class="text-xl font-semibold">{@page_title}</h1>
       </div>
       <div class="bg-slate-50 border rounded">
@@ -54,18 +62,22 @@ defmodule SlapWeb.ChatRoomLive.Index do
         </div>
       </div>
     </main>
+    <.modal id="new-room-modal">
+      <.header>New chat room</.header>
+
+      <.live_component module={SlapWeb.ChatRoomLive.FormComponent} current_user={@current_user} id="new-room-form-component" />
+    </.modal>
     """
   end
 
   def mount(_params, _session, socket) do
     rooms = Chat.list_rooms_with_joined(socket.assigns.current_user)
 
-      socket
-      |> assign(:page_title, "All rooms")
-      |> stream_configure(:rooms, dom_id: fn {room, _} -> "rooms-#{room.id}" end)
-      |> stream(:rooms, rooms)
-      |> ok()
-
+    socket
+    |> assign(:page_title, "All rooms")
+    |> stream_configure(:rooms, dom_id: fn {room, _} -> "rooms-#{room.id}" end)
+    |> stream(:rooms, rooms)
+    |> ok()
   end
 
   def handle_event("toggle-room-membership", %{"id" => id}, socket) do
@@ -76,6 +88,7 @@ defmodule SlapWeb.ChatRoomLive.Index do
 
     {:noreply, stream_insert(socket, :rooms, {room, joined?})}
   end
+
 
   defp open_room(room) do
     JS.navigate(~p"/rooms/#{room}")

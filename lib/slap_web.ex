@@ -55,7 +55,7 @@ defmodule SlapWeb do
       use Phoenix.LiveView,
         layout: {SlapWeb.Layouts, :app}
 
-        import SlapWeb.SocketHelpers
+      import SlapWeb.SocketHelpers
 
       unquote(html_helpers())
     end
@@ -64,6 +64,7 @@ defmodule SlapWeb do
   def live_component do
     quote do
       use Phoenix.LiveComponent
+      import SlapWeb.SocketHelpers
 
       unquote(html_helpers())
     end
