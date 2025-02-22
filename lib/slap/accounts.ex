@@ -105,6 +105,12 @@ defmodule Slap.Accounts do
     )
   end
 
+  def save_user_avatar_path(user, avatar_path) do
+    user
+    |> User.avatar_changeset(%{avatar_path: avatar_path})
+    |> Repo.update()
+  end
+
   ## Settings
 
   @doc """

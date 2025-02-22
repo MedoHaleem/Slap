@@ -5,7 +5,7 @@ defmodule SlapWeb.ChatRoomLive do
   alias Slap.Accounts.User
   alias SlapWeb.OnlineUsers
 
-  import SlapWeb.RoomComponents
+  import SlapWeb.UserComponents
 
   use SlapWeb, :live_view
 
@@ -300,7 +300,7 @@ defmodule SlapWeb.ChatRoomLive do
                 phx-click="show-profile"
                 phx-value-user-id={@current_user.id}
               >
-                <img src={~p"/images/one_ring.jpg"} class="h-8 w-8 rounded" />
+                <.user_avatar user={@current_user} class="h-8 w-8 rounded" />
                 <span class="hover:underline">{@current_user.username}</span>
               </.link>
             </div>
@@ -411,7 +411,12 @@ defmodule SlapWeb.ChatRoomLive do
     </div>
 
     <%= if assigns[:profile] do %>
-      <.live_component id="profile" module={SlapWeb.ChatRoomLive.ProfileComponent} user={@profile} />
+      <.live_component
+        id="profile"
+        module={SlapWeb.ChatRoomLive.ProfileComponent}
+        current_user={@current_user}
+        user={@profile}
+      />
     <% end %>
 
     <.modal
@@ -545,11 +550,11 @@ defmodule SlapWeb.ChatRoomLive do
       >
         <.icon name="hero-trash" class="h-4 w-4" />
       </button>
-      <img
+      <.user_avatar
+        user={@message.user}
         class="h-10 w-10 rounded cursor-pointer"
         phx-click="show-profile"
         phx-value-user-id={@message.user.id}
-        src={~p"/images/one_ring.jpg"}
       />
       <div class="ml-2">
         <div class="-mt-1">
