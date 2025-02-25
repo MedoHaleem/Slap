@@ -259,6 +259,7 @@ defmodule SlapWeb.ChatRoomLive do
         module={ThreadComponent}
         message={@thread}
         room={@room}
+        joined?={@joined?}
         timezone={@timezone}
         current_user={@current_user}
       />
@@ -428,17 +429,19 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_info({:deleted_reply, message}, socket) do
-    if message.room_id == socket.assigns.room.id do
-      socket = stream_insert(socket, :messages, message)
+    socket
+    |> refresh_message(message)
+    |> noreply()
+  end
 
-      if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
-        assign(socket, :thread, message)
-      else
-        socket
-      end
+  def handle_info({:new_reply, message}, socket) do
+    if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
+      push_event(socket, "scroll_thread_to_bottom", %{})
     else
       socket
     end
+    socket
+    |> refresh_message(message)
     |> noreply()
   end
 
@@ -525,6 +528,20 @@ defmodule SlapWeb.ChatRoomLive do
       rem(day, 10) == 2 and day != 12 -> "nd"
       rem(day, 10) == 3 and day != 13 -> "rd"
       true -> "th"
+    end
+  end
+
+  defp refresh_message(socket, message) do
+    if message.room_id == socket.assigns.room.id do
+      socket = stream_insert(socket, :messages, message)
+
+      if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
+        assign(socket, :thread, message)
+      else
+        socket
+      end
+    else
+      socket
     end
   end
 

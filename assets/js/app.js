@@ -23,10 +23,12 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import RoomMessages from "./hooks/RoomMessages"
 import ChatMessageTextArea from "./hooks/ChatMessageTextArea"
+import Thread from "./hooks/Thread"
 
 const hooks = {
   RoomMessages,
-  ChatMessageTextArea
+  ChatMessageTextArea,
+  Thread
 }
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const dateTimeFormat = new Intl.DateTimeFormat();
