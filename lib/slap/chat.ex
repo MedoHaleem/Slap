@@ -1,6 +1,6 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
-  alias Slap.Chat.{Message, Room, RoomMembership}
+  alias Slap.Chat.{Message, Room, RoomMembership, Reply}
   alias Slap.Repo
   import Ecto.Changeset
   import Ecto.Query
@@ -31,15 +31,15 @@ defmodule Slap.Chat do
 
   def list_joined_rooms_with_unread_counts(%User{} = user) do
     from(room in Room,
-    join: membership in assoc(room, :memberships),
-    where: membership.user_id == ^user.id,
-    left_join: message in assoc(room, :messages),
-    on: message.id > membership.last_read_id,
-    group_by: room.id,
-    select: {room, count(message.id)},
-    order_by: [asc: room.name]
-  )
-  |> Repo.all()
+      join: membership in assoc(room, :memberships),
+      where: membership.user_id == ^user.id,
+      left_join: message in assoc(room, :messages),
+      on: message.id > membership.last_read_id,
+      group_by: room.id,
+      select: {room, count(message.id)},
+      order_by: [asc: room.name]
+    )
+    |> Repo.all()
   end
 
   def list_rooms_with_joined(%User{} = user) do
@@ -68,7 +68,8 @@ defmodule Slap.Chat do
         |> change(%{last_read_id: id})
         |> Repo.update()
 
-        nil -> nil
+      nil ->
+        nil
     end
   end
 
@@ -82,14 +83,22 @@ defmodule Slap.Chat do
     end
   end
 
+  def get_message!(id) do
+    Message
+    |> where([m], m.id == ^id)
+    |> preload_message_user_and_replies()
+    |> Repo.one!()
+  end
+
   def unread_message_count(%Room{} = room, %User{} = user) do
     from(room in Room,
-    where: room.id == ^room.id,
-    join: membership in assoc(room, :memberships),
-    where: membership.user_id == ^user.id,
-    join: message in assoc(room, :messages),
-    on: message.id > membership.last_read_id
-    ) |> Repo.aggregate(:count)
+      where: room.id == ^room.id,
+      join: membership in assoc(room, :memberships),
+      where: membership.user_id == ^user.id,
+      join: message in assoc(room, :messages),
+      on: message.id > membership.last_read_id
+    )
+    |> Repo.aggregate(:count)
   end
 
   def get_room!(id) do
@@ -134,7 +143,7 @@ defmodule Slap.Chat do
 
   def create_message(room, attrs, user) do
     with {:ok, message} <-
-           %Message{room: room, user: user}
+           %Message{room: room, user: user, replies: []}
            |> Message.changeset(attrs)
            |> Repo.insert() do
       Phoenix.PubSub.broadcast!(@pubsub, topic(room.id), {:new_message, message})
@@ -147,13 +156,30 @@ defmodule Slap.Chat do
     Message
     |> where([m], m.room_id == ^room_id)
     |> order_by([m], asc: :inserted_at, asc: :id)
-    |> preload(:user)
+    |> preload_message_user_and_replies()
     |> Repo.all()
+  end
+
+  defp preload_message_user_and_replies(message_query) do
+    replies_query = from r in Reply, order_by: [asc: :inserted_at, asc: :id]
+
+    preload(message_query, [:user, replies: ^{replies_query, [:user]}])
   end
 
   def delete_message_by_id(id, %User{id: user_id}) do
     message = %Message{user_id: ^user_id} = Repo.get(Message, id)
     Repo.delete(message)
     Phoenix.PubSub.broadcast!(@pubsub, topic(message.room_id), {:message_deleted, message})
+  end
+
+  def delete_reply_by_id(id, %User{id: user_id}) do
+    with %Reply{} = reply <-
+           from(r in Reply, where: r.id == ^id and r.user_id == ^user_id)
+           |> Repo.one() do
+      Repo.delete(reply)
+      message = get_message!(reply.message_id)
+
+      Phoenix.PubSub.broadcast!(@pubsub, topic(message.room_id), {:deleted_reply, message})
+    end
   end
 end

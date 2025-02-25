@@ -1,22 +1,21 @@
-defmodule Slap.Chat.Message do
+defmodule Slap.Chat.Reply do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Slap.Chat.Message
   alias Slap.Accounts.User
-  alias Slap.Chat.{Reply, Room}
 
-  schema "messages" do
+  schema "replies" do
     field :body, :string
-    belongs_to :room, Room
+    belongs_to :message, Message
     belongs_to :user, User
-    has_many :replies, Repoly
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(message, attrs) do
-    message
+  def changeset(reply, attrs) do
+    reply
     |> cast(attrs, [:body])
     |> validate_required([:body])
   end

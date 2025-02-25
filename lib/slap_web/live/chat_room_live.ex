@@ -4,8 +4,10 @@ defmodule SlapWeb.ChatRoomLive do
   alias Slap.Accounts
   alias Slap.Accounts.User
   alias SlapWeb.OnlineUsers
+  alias SlapWeb.ChatRoomLive.ThreadComponent
 
   import SlapWeb.UserComponents
+  import SlapWeb.ChatComponents
 
   use SlapWeb, :live_view
 
@@ -34,199 +36,6 @@ defmodule SlapWeb.ChatRoomLive do
       end
     )
     |> ok()
-  end
-
-  def handle_params(params, _uri, socket) do
-    rooms = socket.assigns.rooms
-
-    room =
-      case Map.fetch(params, "id") do
-        {:ok, id} ->
-          Chat.get_room!(id)
-
-        :error ->
-          Chat.get_first_room!()
-      end
-
-    last_read_id = Chat.get_last_read_id(room, socket.assigns.current_user)
-
-    messages =
-      room
-      |> Chat.list_messages_in_room()
-      |> insert_date_dividers(socket.assigns.timezone)
-      |> insert_unread_marker(last_read_id)
-
-    Chat.update_last_read_id(room, socket.assigns.current_user)
-
-    socket
-    |> assign(
-      hide_topic?: false,
-      joined?: Chat.joined?(room, socket.assigns.current_user),
-      room: room,
-      page_title: "#" <> room.name,
-      messages: messages
-    )
-    |> stream(:messages, messages, reset: true)
-    |> assign_message_form(Chat.change_message(%Message{}))
-    |> push_event("scroll_messages_to_bottom", %{})
-    |> update(:rooms, fn rooms ->
-      room_id = room.id
-
-      Enum.map(rooms, fn
-        {%Room{id: ^room_id} = room, _} -> {room, 0}
-        other -> other
-      end)
-    end)
-    |> noreply()
-  end
-
-  defp insert_date_dividers(messages, nil), do: messages
-
-  defp insert_date_dividers(messages, timezone) do
-    messages
-    |> Enum.group_by(fn message ->
-      message.inserted_at |> DateTime.shift_zone!(timezone) |> DateTime.to_date()
-    end)
-    |> Enum.sort_by(fn {date, _msg} -> date end, &(Date.compare(&1, &2) != :gt))
-    |> Enum.flat_map(fn {date, messages} -> [date | messages] end)
-  end
-
-  defp insert_unread_marker(messages, nil), do: messages
-
-  defp insert_unread_marker(messages, last_read_id) do
-    {read, unread} =
-      Enum.split_while(messages, fn
-        %Message{} = message -> message.id <= last_read_id
-        _ -> true
-      end)
-
-    if unread == [] do
-      read
-    else
-      read ++ [:unread_marker | unread]
-    end
-  end
-
-  defp assign_message_form(socket, changeset) do
-    assign(socket, :new_message_form, to_form(changeset))
-  end
-
-  def handle_event("submit-message", %{"message" => message_params}, socket) do
-    %{current_user: current_user, room: room} = socket.assigns
-
-    if Chat.joined?(room, current_user) do
-      socket =
-        case Chat.create_message(room, message_params, current_user) do
-          {:ok, _message} ->
-            assign_message_form(socket, Chat.change_message(%Message{}))
-
-          {:error, changeset} ->
-            assign_message_form(socket, changeset)
-        end
-    else
-      socket
-    end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("validate-message", %{"message" => message_params}, socket) do
-    changeset = Chat.change_message(%Message{}, message_params)
-
-    {:noreply, assign_message_form(socket, changeset)}
-  end
-
-  def handle_event("delete-message", %{"id" => id}, socket) do
-    Chat.delete_message_by_id(id, socket.assigns.current_user)
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle-topic", _params, socket) do
-    {:noreply, update(socket, :hide_topic?, &(!&1))}
-  end
-
-  def handle_event("show-profile", %{"user-id" => user_id}, socket) do
-    user = Accounts.get_user!(user_id)
-    {:noreply, assign(socket, :profile, user)}
-  end
-
-  def handle_event("close-profile", _, socket) do
-    {:noreply, assign(socket, :profile, nil)}
-  end
-
-  def handle_event("join-room", _, socket) do
-    current_user = socket.assigns.current_user
-    Chat.join_room!(socket.assigns.room, current_user)
-    Chat.subscribe_to_room(socket.assigns.room)
-
-    socket =
-      assign(socket,
-        joined?: true,
-        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
-      )
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:new_message, message}, socket) do
-    room = socket.assigns.room
-
-    socket =
-      cond do
-        message.room_id == room.id ->
-          Chat.update_last_read_id(room, socket.assigns.current_user)
-
-          socket
-          |> stream_insert(:messages, message)
-          |> push_event("scroll_messages_to_bottom", %{})
-
-        message.user_id != socket.assigns.current_user.id ->
-          update(socket, :rooms, fn rooms ->
-            Enum.map(rooms, fn
-              {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
-              other -> other
-            end)
-          end)
-
-        true ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:message_deleted, message}, socket) do
-    {:noreply, stream_delete(socket, :messages, message)}
-  end
-
-  def handle_info(%{event: "presence_diff", payload: diff}, socket) do
-    online_users = OnlineUsers.update(socket.assigns.online_users, diff)
-
-    {:noreply, assign(socket, online_users: online_users)}
-  end
-
-  def handle_info({:updated_avatar, user}, socket) do
-    socket
-    |> maybe_update_profile(user)
-    |> maybe_update_current_user(user)
-    |> push_event("update_avatar", %{user_id: user.id, avatar_path: user.avatar_path})
-    |> noreply()
-  end
-
-  defp maybe_update_profile(socket, user) do
-    if socket.assigns[:profile] && socket.assigns.profile.id == user.id do
-      assign(socket, :profile, user)
-    else
-      socket
-    end
-  end
-
-  defp maybe_update_current_user(socket, user) do
-    if socket.assigns.current_user.id == user.id do
-      assign(socket, :current_user, user)
-    else
-      socket
-    end
   end
 
   def render(assigns) do
@@ -444,6 +253,17 @@ defmodule SlapWeb.ChatRoomLive do
       />
     <% end %>
 
+    <%= if assigns[:thread] do %>
+      <.live_component
+        id="thread"
+        module={ThreadComponent}
+        message={@thread}
+        room={@room}
+        timezone={@timezone}
+        current_user={@current_user}
+      />
+    <% end %>
+
     <.modal
       id="new-room-modal"
       show={@live_action == :new}
@@ -457,6 +277,230 @@ defmodule SlapWeb.ChatRoomLive do
       />
     </.modal>
     """
+  end
+
+  def handle_params(params, _uri, socket) do
+    rooms = socket.assigns.rooms
+
+    room =
+      case Map.fetch(params, "id") do
+        {:ok, id} ->
+          Chat.get_room!(id)
+
+        :error ->
+          Chat.get_first_room!()
+      end
+
+    last_read_id = Chat.get_last_read_id(room, socket.assigns.current_user)
+
+    messages =
+      room
+      |> Chat.list_messages_in_room()
+      |> insert_date_dividers(socket.assigns.timezone)
+      |> insert_unread_marker(last_read_id)
+
+    Chat.update_last_read_id(room, socket.assigns.current_user)
+
+    socket
+    |> assign(
+      hide_topic?: false,
+      joined?: Chat.joined?(room, socket.assigns.current_user),
+      room: room,
+      page_title: "#" <> room.name,
+      messages: messages
+    )
+    |> stream(:messages, messages, reset: true)
+    |> assign_message_form(Chat.change_message(%Message{}))
+    |> push_event("scroll_messages_to_bottom", %{})
+    |> update(:rooms, fn rooms ->
+      room_id = room.id
+
+      Enum.map(rooms, fn
+        {%Room{id: ^room_id} = room, _} -> {room, 0}
+        other -> other
+      end)
+    end)
+    |> noreply()
+  end
+
+  def handle_event("close-thread", _, socket) do
+    {:noreply, assign(socket, :thread, nil)}
+  end
+
+  def handle_event("show-thread", %{"id" => message_id}, socket) do
+    message = Chat.get_message!(message_id)
+
+    socket |> assign(profile: nil, thread: message) |> noreply()
+  end
+
+  def handle_event("submit-message", %{"message" => message_params}, socket) do
+    %{current_user: current_user, room: room} = socket.assigns
+
+    if Chat.joined?(room, current_user) do
+      socket =
+        case Chat.create_message(room, message_params, current_user) do
+          {:ok, _message} ->
+            assign_message_form(socket, Chat.change_message(%Message{}))
+
+          {:error, changeset} ->
+            assign_message_form(socket, changeset)
+        end
+    else
+      socket
+    end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("validate-message", %{"message" => message_params}, socket) do
+    changeset = Chat.change_message(%Message{}, message_params)
+
+    {:noreply, assign_message_form(socket, changeset)}
+  end
+
+  def handle_event("delete-message", %{"id" => id, "type" => "Message"}, socket) do
+    Chat.delete_message_by_id(id, socket.assigns.current_user)
+    {:noreply, socket}
+  end
+
+  def handle_event("delete-message", %{"id" => id, "type" => "Reply"}, socket) do
+    Chat.delete_reply_by_id(id, socket.assigns.current_user)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle-topic", _params, socket) do
+    {:noreply, update(socket, :hide_topic?, &(!&1))}
+  end
+
+  def handle_event("show-profile", %{"user-id" => user_id}, socket) do
+    user = Accounts.get_user!(user_id)
+    {:noreply, assign(socket, profile: user, thread: nil)}
+  end
+
+  def handle_event("close-profile", _, socket) do
+    {:noreply, assign(socket, :profile, nil)}
+  end
+
+  def handle_event("join-room", _, socket) do
+    current_user = socket.assigns.current_user
+    Chat.join_room!(socket.assigns.room, current_user)
+    Chat.subscribe_to_room(socket.assigns.room)
+
+    socket =
+      assign(socket,
+        joined?: true,
+        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
+      )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:new_message, message}, socket) do
+    room = socket.assigns.room
+
+    socket =
+      cond do
+        message.room_id == room.id ->
+          Chat.update_last_read_id(room, socket.assigns.current_user)
+
+          socket
+          |> stream_insert(:messages, message)
+          |> push_event("scroll_messages_to_bottom", %{})
+
+        message.user_id != socket.assigns.current_user.id ->
+          update(socket, :rooms, fn rooms ->
+            Enum.map(rooms, fn
+              {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
+              other -> other
+            end)
+          end)
+
+        true ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:message_deleted, message}, socket) do
+    {:noreply, stream_delete(socket, :messages, message)}
+  end
+
+  def handle_info({:deleted_reply, message}, socket) do
+    if message.room_id == socket.assigns.room.id do
+      socket = stream_insert(socket, :messages, message)
+
+      if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
+        assign(socket, :thread, message)
+      else
+        socket
+      end
+    else
+      socket
+    end
+    |> noreply()
+  end
+
+  def handle_info(%{event: "presence_diff", payload: diff}, socket) do
+    online_users = OnlineUsers.update(socket.assigns.online_users, diff)
+
+    {:noreply, assign(socket, online_users: online_users)}
+  end
+
+  def handle_info({:updated_avatar, user}, socket) do
+    socket
+    |> maybe_update_profile(user)
+    |> maybe_update_current_user(user)
+    |> push_event("update_avatar", %{user_id: user.id, avatar_path: user.avatar_path})
+    |> noreply()
+  end
+
+  defp maybe_update_profile(socket, user) do
+    if socket.assigns[:profile] && socket.assigns.profile.id == user.id do
+      assign(socket, :profile, user)
+    else
+      socket
+    end
+  end
+
+  defp maybe_update_current_user(socket, user) do
+    if socket.assigns.current_user.id == user.id do
+      assign(socket, :current_user, user)
+    else
+      socket
+    end
+  end
+
+  defp insert_date_dividers(messages, nil), do: messages
+
+  defp insert_date_dividers(messages, timezone) do
+    messages
+    |> Enum.group_by(fn message ->
+      message.inserted_at |> DateTime.shift_zone!(timezone) |> DateTime.to_date()
+    end)
+    |> Enum.sort_by(fn {date, _msg} -> date end, &(Date.compare(&1, &2) != :gt))
+    |> Enum.flat_map(fn {date, messages} -> [date | messages] end)
+  end
+
+  defp insert_unread_marker(messages, nil), do: messages
+
+  defp insert_unread_marker(messages, last_read_id) do
+    {read, unread} =
+      Enum.split_while(messages, fn
+        %Message{} = message -> message.id <= last_read_id
+        _ -> true
+      end)
+
+    if unread == [] do
+      read
+    else
+      read ++ [:unread_marker | unread]
+    end
+  end
+
+  defp assign_message_form(socket, changeset) do
+    assign(socket, :new_message_form, to_form(changeset))
   end
 
   defp format_date(%Date{} = date) do
@@ -556,54 +600,6 @@ defmodule SlapWeb.ChatRoomLive do
       <.unread_message_counter count={@unread_count} />
     </.link>
     """
-  end
-
-  attr :message, Message, required: true
-  attr :dom_id, :string, required: true
-  attr :timezone, :string, required: true
-  attr :current_user, User, required: true
-
-  defp message(assigns) do
-    ~H"""
-    <div id={@dom_id} class="group relative flex px-4 py-3">
-      <button
-        :if={@current_user.id == @message.user_id}
-        class="absolute top-4 right-4 text-red-500 hover:text-red-800 cursor-pointer hidden group-hover:block"
-        data-confirm="Are you Sure?"
-        phx-click="delete-message"
-        phx-value-id={@message.id}
-      >
-        <.icon name="hero-trash" class="h-4 w-4" />
-      </button>
-      <.user_avatar
-        user={@message.user}
-        class="h-10 w-10 rounded cursor-pointer"
-        phx-click="show-profile"
-        phx-value-user-id={@message.user.id}
-      />
-      <div class="ml-2">
-        <div class="-mt-1">
-          <.link
-            phx-click="show-profile"
-            phx-value-user-id={@message.user.id}
-            class="text-sm font-semibold hover:underline"
-          >
-            <span>{@message.user.username}</span>
-          </.link>
-          <span :if={@timezone} class="ml-1 text-xs text-gray-500">
-            {message_timestamp(@message, @timezone)}
-          </span>
-          <p class="text-sm">{@message.body}</p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp message_timestamp(message, timezone) do
-    message.inserted_at
-    |> Timex.Timezone.convert(timezone)
-    |> Timex.format!("%-l:%M %p", :strftime)
   end
 
   attr :count, :integer, required: true
