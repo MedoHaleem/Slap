@@ -61,23 +61,71 @@ defmodule SlapWeb.ChatRoomLive.Index do
           </div>
         </div>
       </div>
+      <div :if={@num_pages > 1} class="py-4">
+        <nav class="flex justify-around">
+          <ul class="flex items-center -space-x-px h-10 text-base">
+            <li>
+              <.link
+                patch={
+                  if @page == 1 do
+                    ""
+                  else
+                    ~p"/rooms?page=#{@page - 1}"
+                  end
+                }
+                class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700"
+              >
+                <span class="sr-only">Previous</span> &lsaquo;
+              </.link>
+            </li>
+            <.page_number :for={i <- 1..@num_pages} number={i} current?={i == @page} />
+            <li>
+              <.link
+                patch={
+                  if @page + 1 > @num_pages do
+                    ""
+                  else
+                    ~p"/rooms?page=#{@page + 1}"
+                  end
+                }
+                class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700"
+              >
+                <span class="sr-only">Next</span> &rsaquo;
+              </.link>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </main>
     <.modal id="new-room-modal">
       <.header>New chat room</.header>
 
-      <.live_component module={SlapWeb.ChatRoomLive.FormComponent} current_user={@current_user} id="new-room-form-component" />
+      <.live_component
+        module={SlapWeb.ChatRoomLive.FormComponent}
+        current_user={@current_user}
+        id="new-room-form-component"
+      />
     </.modal>
     """
   end
 
   def mount(_params, _session, socket) do
-    rooms = Chat.list_rooms_with_joined(socket.assigns.current_user)
-
     socket
     |> assign(:page_title, "All rooms")
+    |> assign(num_pages: Chat.count_room_pages())
     |> stream_configure(:rooms, dom_id: fn {room, _} -> "rooms-#{room.id}" end)
-    |> stream(:rooms, rooms)
     |> ok()
+  end
+
+  def handle_params(params, _uri, socket) do
+    page = params |> Map.get("page", "1") |> String.to_integer()
+
+    rooms = Chat.list_rooms_with_joined(page, socket.assigns.current_user)
+
+    socket
+    |> assign(page: page)
+    |> stream(:rooms, rooms, reset: true)
+    |> noreply()
   end
 
   def handle_event("toggle-room-membership", %{"id" => id}, socket) do
@@ -89,8 +137,30 @@ defmodule SlapWeb.ChatRoomLive.Index do
     {:noreply, stream_insert(socket, :rooms, {room, joined?})}
   end
 
-
   defp open_room(room) do
     JS.navigate(~p"/rooms/#{room}")
+  end
+
+  attr :number, :any, required: true
+  attr :current?, :boolean, default: false
+
+  defp page_number(assigns) do
+    ~H"""
+    <li>
+      <.link
+        patch={~p"/rooms?page=#{@number}"}
+        class={[
+          "flex items-center justify-center px-4 h-10 leading-tight",
+          if @current? do
+            "text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
+          else
+            "text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700"
+          end
+        ]}
+      >
+        {@number}
+      </.link>
+    </li>
+    """
   end
 end

@@ -6,6 +6,7 @@ defmodule Slap.Chat do
   import Ecto.Query
 
   @pubsub Slap.PubSub
+  @room_page_size 10
 
   def subscribe_to_room(room) do
     Phoenix.PubSub.subscribe(@pubsub, topic(room.id))
@@ -42,15 +43,23 @@ defmodule Slap.Chat do
     |> Repo.all()
   end
 
-  def list_rooms_with_joined(%User{} = user) do
+  def list_rooms_with_joined(page, %User{} = user) do
+    offset = (page - 1) * @room_page_size
+
     query =
       from r in Room,
         left_join: m in RoomMembership,
         on: r.id == m.room_id and m.user_id == ^user.id,
         select: {r, not is_nil(m.id)},
-        order_by: [asc: :name]
+        order_by: [asc: :name],
+        limit: ^@room_page_size,
+        offset: ^offset
 
     Repo.all(query)
+  end
+
+  def count_room_pages do
+    ceil(Repo.aggregate(Room, :count) / @room_page_size)
   end
 
   def joined?(%Room{} = room, %User{} = user) do
