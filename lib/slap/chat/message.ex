@@ -9,7 +9,7 @@ defmodule Slap.Chat.Message do
     field :body, :string
     belongs_to :room, Room
     belongs_to :user, User
-    has_many :replies, Repoly
+    has_many :replies, Reply
 
     timestamps(type: :utc_datetime)
   end
