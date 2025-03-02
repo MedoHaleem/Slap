@@ -2,7 +2,7 @@ defmodule Slap.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Slap.Chat.{Room, RoomMembership}
+  alias Slap.Chat.{Room, RoomMembership, Reaction}
 
   schema "users" do
     field :email, :string
@@ -14,6 +14,7 @@ defmodule Slap.Accounts.User do
     field :avatar_path, :string
 
     many_to_many :rooms, Room, join_through: RoomMembership
+    has_many :reactions, Reaction
 
     timestamps(type: :utc_datetime)
   end
