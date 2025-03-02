@@ -2,7 +2,7 @@ defmodule Slap.Chat.Room do
   use Ecto.Schema
   import Ecto.Changeset
   alias Slap.Accounts.User
-  alias Slap.Chat.{Message, RoomMembership}
+  alias Slap.Chat.RoomMembership
 
 
   schema "rooms" do

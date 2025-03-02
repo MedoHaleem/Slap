@@ -281,8 +281,6 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_params(params, _uri, socket) do
-    rooms = socket.assigns.rooms
-
     room =
       case Map.fetch(params, "id") do
         {:ok, id} ->
@@ -394,6 +392,22 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply, socket}
   end
 
+  def handle_event("add-reaction", %{"emoji" => emoji, "message_id" => message_id}, socket) do
+    message = Chat.get_message!(message_id)
+
+    Chat.add_reaction(emoji, message, socket.assigns.current_user)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("remove-reaction", %{"message_id" => message, "emoji" => emoji}, socket) do
+    message = Chat.get_message!(message)
+
+    Chat.remove_reaction(emoji, message, socket.assigns.current_user)
+
+    {:noreply, socket}
+  end
+
   def handle_event("toggle-topic", _params, socket) do
     {:noreply, update(socket, :hide_topic?, &(!&1))}
   end
@@ -464,6 +478,22 @@ defmodule SlapWeb.ChatRoomLive do
     else
       socket
     end
+
+    socket
+    |> refresh_message(message)
+    |> noreply()
+  end
+
+  def handle_info({:added_reaction, reaction}, socket) do
+    message = Chat.get_message!(reaction.message_id)
+
+    socket
+    |> refresh_message(message)
+    |> noreply()
+  end
+
+  def handle_info({:removed_reaction, reaction}, socket) do
+    message = Chat.get_message!(reaction.message_id)
 
     socket
     |> refresh_message(message)

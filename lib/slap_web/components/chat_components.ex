@@ -63,6 +63,9 @@ defmodule SlapWeb.ChatComponents do
           >
             <%= for {emoji, count, me?} <- enumerate_reactions(@message.reactions, @current_user) do %>
               <button
+                phx-click={if me?, do: "remove-reaction", else: "add-reaction"}
+                phx-value-emoji={emoji}
+                phx-value-message_id={@message.id}
                 class={[
                   "flex items-center pl-2 pr-2 h-6 rounded-full text-xs",
                   me? && "bg-blue-100 border border-blue-400",

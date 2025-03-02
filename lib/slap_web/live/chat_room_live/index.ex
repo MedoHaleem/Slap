@@ -1,6 +1,5 @@
 defmodule SlapWeb.ChatRoomLive.Index do
   use SlapWeb, :live_view
-  alias Slap.Chat.Room
   alias Slap.Chat
 
   def render(assigns) do
