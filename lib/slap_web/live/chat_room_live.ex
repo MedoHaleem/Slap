@@ -447,6 +447,7 @@ defmodule SlapWeb.ChatRoomLive do
           socket
           |> stream_insert(:messages, message)
           |> push_event("scroll_messages_to_bottom", %{})
+          |> highlight_message(message)
 
         message.user_id != socket.assigns.current_user.id ->
           update(socket, :rooms, fn rooms ->
@@ -461,6 +462,15 @@ defmodule SlapWeb.ChatRoomLive do
       end
 
     {:noreply, socket}
+  end
+
+  defp highlight_message(socket, message) do
+    socket =
+      if message.user_id != socket.assigns.current_user.id do
+        push_event(socket, "highlight_message", %{id: message.id})
+      else
+        socket
+      end
   end
 
   def handle_info({:message_deleted, message}, socket) do

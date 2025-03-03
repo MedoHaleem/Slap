@@ -37,6 +37,18 @@ const RoomMessages = {
       });
     });
 
+    this.handleEvent("highlight_message", ({ id }) => {
+      const item = document.getElementById(`messages-${id}`);
+      if (item) {
+        item.classList.add('highlight');
+        setTimeout(() => {
+          item.classList.remove('highlight');
+          item.classList.add('no-highlight');
+        }, 3000);
+      }
+    });
+
+
     this.el.addEventListener("show_emoji_picker", (e) => {
       const picker = new Picker({
         onClickOutside: () => this.closePicker(),
