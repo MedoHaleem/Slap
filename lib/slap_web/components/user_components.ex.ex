@@ -16,7 +16,7 @@ defmodule SlapWeb.UserComponents do
     if user.avatar_path do
       ~p"/uploads/#{user.avatar_path}"
     else
-      ~p"/images/one_ring.jpg"
+      ~p"/images/profile_avatar.png"
     end
   end
 end

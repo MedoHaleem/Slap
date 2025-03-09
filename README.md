@@ -2,6 +2,25 @@
 
 Welcome to "Slap," a project designed as a Slack clone to practice Phoenix LiveView 1.0. This README provides instructions on setting up your development environment and gives you information about the application.
 
+## Features
+
+"Slap" includes several features that mimic Slack's functionality:
+
+- **Room Management:** Users can create, edit, and delete their rooms.
+- **Browse Rooms:** Users have the ability to browse different rooms and join them.
+- **Profile Customization:** Users can upload profile pictures.
+- **Real-Time Messaging:** Send and receive messages in real-time with other users.
+- **Notifications:** Users get notified of new messages.
+- **Message Organization:** Messages are divided by date for easier browsing.
+- **Message Management:** Users can delete their own messages.
+- **Thread Expansion:** Expand message threads to view more details.
+- **Message Reactions:** React to other user's messages.
+
+## ScreenShot
+
+![Slap Demo](priv/static/images/demo.png)
+
+
 ## Getting Started
 
 To set up and run your Phoenix server for this Slack-like application, follow these steps:

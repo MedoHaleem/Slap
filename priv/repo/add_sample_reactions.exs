@@ -8,7 +8,7 @@ emojis = [
 ]
 
 
-room = Room |> Repo.get_by!(name: "council-of-elrond") |> Repo.preload(:messages)
+room = Room |> Repo.get_by!(name: "phonix") |> Repo.preload(:messages)
 
 users = Repo.all(User)
 
