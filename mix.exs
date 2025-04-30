@@ -61,7 +61,8 @@ defmodule Slap.MixProject do
       {:bandit, "~> 1.5"},
       {:timex, "~> 3.7"},
       {:faker, "~> 0.18", only: :dev},
-      {:paginator, "~> 1.2.0"}
+      {:paginator, "~> 1.2.0"},
+      {:tidewave, "~> 0.1.2", only: :dev}
     ]
   end
 
