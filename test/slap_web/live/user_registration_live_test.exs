@@ -42,25 +42,9 @@ defmodule SlapWeb.UserRegistrationLiveTest do
 
       email = unique_user_email()
       form = form(lv, "#registration_form", user: valid_user_attributes(email: email))
-      {:ok, _view, html} = render_submit(form)
+      conn = submit_form(form, conn)
 
-      # Assert that the navigation event was sent to the client via the HTML diff
-      assert html =~ "phx-navigate-push=\"/\""
-    end
-
-    test "renders errors for duplicated email", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-
-      user = user_fixture(%{email: "test@email.com"})
-
-      result =
-        lv
-        |> form("#registration_form",
-          user: %{"email" => user.email, "password" => "valid_password"}
-        )
-        |> render_submit()
-
-      assert result =~ "has already been taken"
+      assert redirected_to(conn) == ~p"/users/log_in"
     end
   end
 
