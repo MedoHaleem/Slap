@@ -1,7 +1,7 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
-  alias Slap.Chat.{Message, Room, RoomMembership, Reply, Reaction}
-  alias Slap.Repo
+  alias Slap.Chat.{Message, Room, RoomMembership, Reply, Reaction, MessageAttachment}
+  alias Slap.{Repo, Uploads}
   import Ecto.Changeset
   import Ecto.Query
 
@@ -97,6 +97,7 @@ defmodule Slap.Chat do
     |> where([m], m.id == ^id)
     |> preload_message_user_and_replies()
     |> preload_reactions()
+    |> preload_attachments()
     |> Repo.one!()
   end
 
@@ -152,13 +153,67 @@ defmodule Slap.Chat do
   end
 
   def create_message(room, attrs, user) do
-    with {:ok, message} <-
-           %Message{room: room, user: user, replies: [], reactions: []}
-           |> Message.changeset(attrs)
-           |> Repo.insert() do
-      Phoenix.PubSub.broadcast!(@pubsub, topic(room.id), {:new_message, message})
+    result =
+      Repo.transaction(fn ->
+        with {:ok, message} <-
+               %Message{room: room, user: user, replies: [], reactions: []}
+               |> Message.changeset(attrs)
+               |> Repo.insert() do
+          # Handle file attachments
+          case attrs["pdf_file"] do
+            %Plug.Upload{} = upload ->
+              create_message_attachment(message, upload)
 
-      {:ok, message}
+            _ ->
+              :ok
+          end
+
+          message = message |> Repo.preload([:attachments])
+          Phoenix.PubSub.broadcast!(@pubsub, topic(room.id), {:new_message, message})
+          message
+        end
+      end)
+
+    case result do
+      {:ok, message} -> {:ok, message}
+      {:error, _} = error -> error
+    end
+  end
+
+  def create_message_attachment(message, upload) do
+    # The file is already in the uploads directory from the component
+    # Just create the attachment record with the right path
+    %MessageAttachment{}
+    |> MessageAttachment.changeset(%{
+      file_path: Path.join(Uploads.upload_path_prefix(), Path.basename(upload.path)),
+      file_name: upload.filename,
+      file_type: upload.content_type,
+      # The file should already exist at upload.path
+      file_size:
+        if File.exists?(upload.path) do
+          File.stat!(upload.path).size
+        else
+          0
+        end,
+      message_id: message.id
+    })
+    |> Repo.insert!()
+  end
+
+  def delete_message_attachment(attachment_id, %User{} = user) do
+    attachment =
+      MessageAttachment
+      |> join(:inner, [a], m in Message, on: a.message_id == m.id)
+      |> where([_, m], m.user_id == ^user.id)
+      |> where([a], a.id == ^attachment_id)
+      |> select([a], a)
+      |> Repo.one()
+
+    if attachment do
+      Uploads.delete_file(attachment.file_path)
+      Repo.delete(attachment)
+    else
+      {:error, :not_found}
     end
   end
 
@@ -168,6 +223,7 @@ defmodule Slap.Chat do
     |> order_by([m], desc: :inserted_at, asc: :id)
     |> preload_message_user_and_replies()
     |> preload_reactions()
+    |> preload_attachments()
     |> Repo.paginate(
       after: opts[:after],
       limit: 50,
@@ -187,8 +243,20 @@ defmodule Slap.Chat do
     preload(message_query, [:user, replies: ^{replies_query, [:user]}])
   end
 
+  defp preload_attachments(message_query) do
+    preload(message_query, :attachments)
+  end
+
   def delete_message_by_id(id, %User{id: user_id}) do
     message = %Message{user_id: ^user_id} = Repo.get(Message, id)
+
+    # Delete attachments
+    message = message |> Repo.preload(:attachments)
+
+    Enum.each(message.attachments, fn attachment ->
+      Uploads.delete_file(attachment.file_path)
+    end)
+
     Repo.delete(message)
     Phoenix.PubSub.broadcast!(@pubsub, topic(message.room_id), {:message_deleted, message})
   end

@@ -19,7 +19,7 @@ defmodule SlapWeb.ChatComponents do
         :if={!@in_thread? || @current_user.id == @message.user_id}
         class="absolute top-4 right-4 hidden group-hover:block bg-white shadow-sm px-2 pb-1 rounded border border-px border-slate-300 gap-1"
       >
-      <button
+        <button
           :if={!@in_thread?}
           phx-click={
             JS.dispatch(
@@ -31,7 +31,7 @@ defmodule SlapWeb.ChatComponents do
         >
           <.icon name="hero-face-smile" class="h-5 w-5" />
         </button>
-
+        
         <button
           :if={!@in_thread?}
           phx-click="show-thread"
@@ -40,7 +40,7 @@ defmodule SlapWeb.ChatComponents do
         >
           <.icon name="hero-chat-bubble-bottom-center-text" class="h-4 w-4" />
         </button>
-
+        
         <button
           :if={@current_user.id == @message.user_id}
           class="text-red-500 hover:text-red-800 cursor-pointer"
@@ -52,6 +52,7 @@ defmodule SlapWeb.ChatComponents do
           <.icon name="hero-trash" class="h-4 w-4" />
         </button>
       </div>
+      
       <.user_avatar
         user={@message.user}
         class="h-10 w-10 rounded cursor-pointer"
@@ -67,9 +68,11 @@ defmodule SlapWeb.ChatComponents do
           >
             <span>{@message.user.username}</span>
           </.link>
+          
           <span :if={@timezone} class="ml-1 text-xs text-gray-500">
             {message_timestamp(@message, @timezone)}
           </span>
+          
           <div
             :if={is_struct(@message, Message) && Enum.any?(@message.reactions)}
             class="flex space-x-2 mt-2"
@@ -85,12 +88,42 @@ defmodule SlapWeb.ChatComponents do
                   !me? && "bg-slate-200 hover:bg-slate-400"
                 ]}
               >
-                <span>{emoji}</span>
-                <span class="ml-1 font-medium">{count}</span>
+                <span>{emoji}</span> <span class="ml-1 font-medium">{count}</span>
               </button>
             <% end %>
           </div>
+          
           <p class="text-sm">{@message.body}</p>
+          
+          <div :if={is_struct(@message, Message) && Enum.any?(@message.attachments)}>
+            <%= for attachment <- @message.attachments do %>
+              <div class="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200 max-w-sm">
+                <div class="flex-shrink-0">
+                  <.icon name="hero-document-text" class="h-5 w-5 text-red-600" />
+                </div>
+                
+                <div class="overflow-hidden flex-grow">
+                  <p class="text-xs font-medium text-gray-700 truncate" title={attachment.file_name}>
+                    {attachment.file_name}
+                  </p>
+                  
+                  <p class="text-xs text-gray-500">
+                    {format_file_size(attachment.file_size)}
+                  </p>
+                </div>
+                
+                <a
+                  href={attachment.file_path}
+                  target="_blank"
+                  class="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded flex-shrink-0"
+                  download={attachment.file_name}
+                >
+                  Download
+                </a>
+              </div>
+            <% end %>
+          </div>
+          
           <div
             :if={!@in_thread? && Enum.any?(@message.replies)}
             class="inline-flex items-center mt-2 rounded border border-transparent hover:border-slate-200 hover:bg-slate-50 py-1 pr-2 box-border cursor-pointer"
@@ -141,4 +174,14 @@ defmodule SlapWeb.ChatComponents do
       {emoji, length(reactions), me?}
     end)
   end
+
+  defp format_file_size(bytes) when is_integer(bytes) do
+    cond do
+      bytes >= 1_000_000 -> "#{Float.round(bytes / 1_000_000, 1)} MB"
+      bytes >= 1_000 -> "#{Float.round(bytes / 1_000, 1)} KB"
+      true -> "#{bytes} bytes"
+    end
+  end
+
+  defp format_file_size(_), do: "Unknown size"
 end

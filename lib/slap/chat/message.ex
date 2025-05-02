@@ -3,7 +3,7 @@ defmodule Slap.Chat.Message do
   import Ecto.Changeset
 
   alias Slap.Accounts.User
-  alias Slap.Chat.{Reply, Room, Reaction}
+  alias Slap.Chat.{Reply, Room, Reaction, MessageAttachment}
 
   schema "messages" do
     field :body, :string
@@ -11,6 +11,7 @@ defmodule Slap.Chat.Message do
     belongs_to :user, User
     has_many :replies, Reply
     has_many :reactions, Reaction
+    has_many :attachments, MessageAttachment
 
     timestamps(type: :utc_datetime)
   end
