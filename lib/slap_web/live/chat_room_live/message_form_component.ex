@@ -150,7 +150,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
   defp process_file_uploads(message_params, socket) do
     # Check if there are any uploaded files
     case uploaded_entries(socket, :pdf_file) do
-      {[entry], _} ->
+      {[_entry], _} ->
         # Consume the upload immediately and get the upload
         upload =
           consume_uploaded_entries(socket, :pdf_file, fn %{path: path}, entry ->

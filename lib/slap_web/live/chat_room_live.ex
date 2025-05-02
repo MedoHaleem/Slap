@@ -1,14 +1,12 @@
 defmodule SlapWeb.ChatRoomLive do
   use SlapWeb, :live_view
+  alias Phoenix.LiveView.JS
 
   import SlapWeb.SocketHelpers
-  import SlapWeb.UserComponents
-  import SlapWeb.ChatComponents
 
+  alias Slap.Accounts
   alias Slap.Chat
   alias Slap.Chat.{Message, Room}
-  alias Slap.Accounts
-  alias Slap.Accounts.User
   alias SlapWeb.OnlineUsers
 
   alias SlapWeb.ChatRoomLive.{
@@ -111,7 +109,7 @@ defmodule SlapWeb.ChatRoomLive do
       on_cancel={JS.navigate(~p"/rooms/#{@room}")}
     >
       <.header>New chat room</.header>
-      
+
       <.live_component
         module={SlapWeb.ChatRoomLive.FormComponent}
         id="new-room-form-component"
@@ -202,8 +200,8 @@ defmodule SlapWeb.ChatRoomLive do
   def handle_event("submit-message", %{"message" => message_params}, socket) do
     %{current_user: current_user, room: room} = socket.assigns
 
-    if Chat.joined?(room, current_user) do
-      socket =
+    socket =
+      if Chat.joined?(room, current_user) do
         case Chat.create_message(room, message_params, current_user) do
           {:ok, _message} ->
             assign_message_form(socket, Chat.change_message(%Message{}))
@@ -211,9 +209,9 @@ defmodule SlapWeb.ChatRoomLive do
           {:error, changeset} ->
             assign_message_form(socket, changeset)
         end
-    else
-      socket
-    end
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -251,8 +249,8 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply, socket}
   end
 
-  def handle_event("toggle-topic", _params, socket) do
-    {:noreply, update(socket, :hide_topic?, &(!&1))}
+  def handle_event("toggle-topic", _, socket) do
+    {:noreply, update(socket, :show_topic, fn show -> !show end)}
   end
 
   def handle_event("show-profile", %{"user-id" => user_id}, socket) do
