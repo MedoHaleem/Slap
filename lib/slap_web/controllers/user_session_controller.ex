@@ -20,7 +20,9 @@ defmodule SlapWeb.UserSessionController do
   end
 
   defp create(conn, %{"user" => user_params}, info) do
-    %{"email_or_username" => email_or_username, "password" => password} = user_params
+    # Handle both email and email_or_username for backward compatibility
+    email_or_username = user_params["email_or_username"] || user_params["email"]
+    password = user_params["password"]
 
     if user = Accounts.get_authenticated_user(email_or_username, password) do
       conn
@@ -29,7 +31,7 @@ defmodule SlapWeb.UserSessionController do
     else
       # In order to prevent user enumeration attacks, don't disclose whether the email is registered.
       conn
-      |> put_flash(:error, "Invalid login")
+      |> put_flash(:error, "Invalid email or password")
       |> put_flash(:email, String.slice(email_or_username, 0, 160))
       |> redirect(to: ~p"/users/log_in")
     end

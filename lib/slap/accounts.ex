@@ -57,6 +57,15 @@ defmodule Slap.Accounts do
   end
 
   @doc """
+  Alias for get_authenticated_user/2 to maintain backward compatibility with tests.
+  Gets a user by email and password.
+  """
+  def get_user_by_email_and_password(email, password)
+      when is_binary(email) and is_binary(password) do
+    get_authenticated_user(email, password)
+  end
+
+  @doc """
   Gets a single user.
 
   Raises `Ecto.NoResultsError` if the User does not exist.

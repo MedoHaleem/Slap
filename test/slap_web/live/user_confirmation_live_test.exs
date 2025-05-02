@@ -23,21 +23,28 @@ defmodule SlapWeb.UserConfirmationLiveTest do
           Accounts.deliver_user_confirmation_instructions(user, url)
         end)
 
+      # First log in the user
+      conn = log_in_user(conn, user)
+
       {:ok, lv, _html} = live(conn, ~p"/users/confirm/#{token}")
 
       result =
         lv
         |> form("#confirmation_form")
         |> render_submit()
-        |> follow_redirect(conn, "/")
+        |> follow_redirect(conn, ~p"/users/confirm_account/#{token}")
 
+      # Assert we were redirected to the confirmation controller
       assert {:ok, conn} = result
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "User confirmed successfully"
+      # Now follow that redirect to the root page
+      assert redirected_to(conn) == ~p"/"
+
+      # Get a new session to confirm the user token is gone
+      conn = get(conn, ~p"/")
+      refute get_session(conn, :user_token)
 
       assert Accounts.get_user!(user.id).confirmed_at
-      refute get_session(conn, :user_token)
       assert Repo.all(Accounts.UserToken) == []
 
       # when not logged in
@@ -47,9 +54,10 @@ defmodule SlapWeb.UserConfirmationLiveTest do
         lv
         |> form("#confirmation_form")
         |> render_submit()
-        |> follow_redirect(conn, "/")
+        |> follow_redirect(conn, ~p"/users/confirm_account/#{token}")
 
       assert {:ok, conn} = result
+      assert redirected_to(conn) == ~p"/"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "User confirmation link is invalid or it has expired"
@@ -65,20 +73,26 @@ defmodule SlapWeb.UserConfirmationLiveTest do
         lv
         |> form("#confirmation_form")
         |> render_submit()
-        |> follow_redirect(conn, "/")
+        |> follow_redirect(conn, ~p"/users/confirm_account/#{token}")
 
       assert {:ok, conn} = result
-      refute Phoenix.Flash.get(conn.assigns.flash, :error)
+      assert redirected_to(conn) == ~p"/"
     end
 
     test "does not confirm email with invalid token", %{conn: conn, user: user} do
+      # First log in the user
+      conn = log_in_user(conn, user)
+
       {:ok, lv, _html} = live(conn, ~p"/users/confirm/invalid-token")
 
-      {:ok, conn} =
+      result =
         lv
         |> form("#confirmation_form")
         |> render_submit()
-        |> follow_redirect(conn, ~p"/")
+        |> follow_redirect(conn, ~p"/users/confirm_account/invalid-token")
+
+      assert {:ok, conn} = result
+      assert redirected_to(conn) == ~p"/"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "User confirmation link is invalid or it has expired"

@@ -79,6 +79,9 @@ defmodule SlapWeb.Router do
 
     delete "/users/log_out", UserSessionController, :delete
 
+    # Add a route for confirming users with our controller
+    get "/users/confirm_account/:token", UserConfirmationController, :confirm
+
     live_session :current_user,
       on_mount: [{SlapWeb.UserAuth, :mount_current_user}] do
       live "/users/confirm/:token", UserConfirmationLive, :edit

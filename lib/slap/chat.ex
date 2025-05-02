@@ -23,7 +23,16 @@ defmodule Slap.Chat do
   end
 
   def get_first_room! do
-    Repo.one!(from r in Room, limit: 1, order_by: [asc: :name])
+    # Try to get the first room
+    case Repo.one(from r in Room, limit: 1, order_by: [asc: :name]) do
+      nil ->
+        # No rooms exist, create a default "general" room
+        {:ok, room} = create_room(%{name: "general", topic: "General discussion"})
+        room
+
+      room ->
+        room
+    end
   end
 
   def list_rooms do
