@@ -24,11 +24,13 @@ import topbar from "../vendor/topbar"
 import RoomMessages from "./hooks/RoomMessages"
 import ChatMessageTextArea from "./hooks/ChatMessageTextArea"
 import Thread from "./hooks/Thread"
+import { VoiceChatHook } from "./hooks/voice_chat"
 
 const hooks = {
   RoomMessages,
   ChatMessageTextArea,
-  Thread
+  Thread,
+  VoiceChat: VoiceChatHook
 }
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const dateTimeFormat = new Intl.DateTimeFormat();

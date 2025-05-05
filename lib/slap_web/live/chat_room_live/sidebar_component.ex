@@ -110,16 +110,27 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
 
   defp user(assigns) do
     ~H"""
-    <.link class="flex items-center h-8 hover:bg-gray-300 text-sm pl-8 pr-3" href="#">
-      <div class="flex justify-center w-4">
-        <%= if @online do %>
-          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-        <% else %>
-          <span class="w-2 h-2 rounded-full border-2 border-gray-500"></span>
-        <% end %>
-      </div>
-      <span class="ml-2 leading-none">{@user.username}</span>
-    </.link>
+    <div class="flex items-center h-8 hover:bg-gray-300 text-sm pl-8 pr-3 justify-between group">
+      <.link class="flex items-center" href="#">
+        <div class="flex justify-center w-4">
+          <%= if @online do %>
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          <% else %>
+            <span class="w-2 h-2 rounded-full border-2 border-gray-500"></span>
+          <% end %>
+        </div>
+        <span class="ml-2 leading-none">{@user.username}</span>
+      </.link>
+      <%= if @online do %>
+        <button
+          phx-click={JS.navigate(~p"/voice-chat/#{@user.id}")}
+          class="voice-chat-btn opacity-0 group-hover:opacity-100"
+          title="Start voice chat"
+        >
+          <.icon name="hero-microphone" class="h-4 w-4 text-gray-600 hover:text-gray-800" />
+        </button>
+      <% end %>
+    </div>
     """
   end
 

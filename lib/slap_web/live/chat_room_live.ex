@@ -25,6 +25,8 @@ defmodule SlapWeb.ChatRoomLive do
 
     if connected?(socket) do
       OnlineUsers.track(self(), socket.assigns.current_user)
+      # Subscribe to voice call requests
+      SlapWeb.Endpoint.subscribe("voice:#{socket.assigns.current_user.id}")
     end
 
     OnlineUsers.subscribe()
@@ -35,6 +37,7 @@ defmodule SlapWeb.ChatRoomLive do
     socket
     |> assign(rooms: rooms, timezone: timezone, users: users)
     |> assign(online_users: OnlineUsers.list())
+    |> assign(incoming_call: nil)
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
@@ -101,6 +104,35 @@ defmodule SlapWeb.ChatRoomLive do
         timezone={@timezone}
         current_user={@current_user}
       />
+    <% end %>
+
+    <%= if @incoming_call do %>
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+          <div class="text-center mb-4">
+            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <.icon name="hero-phone" class="h-8 w-8 text-purple-600" />
+            </div>
+            <h3 class="text-lg font-bold">Incoming Call</h3>
+            <p class="text-gray-600">{@incoming_call.username} is calling you</p>
+          </div>
+
+          <div class="flex space-x-3 justify-center">
+            <button
+              phx-click="accept_call"
+              class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center"
+            >
+              <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
+            </button>
+            <button
+              phx-click="reject_call"
+              class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full flex items-center"
+            >
+              <.icon name="hero-x-mark" class="h-5 w-5 mr-2" /> Reject
+            </button>
+          </div>
+        </div>
+      </div>
     <% end %>
 
     <.modal
@@ -355,6 +387,45 @@ defmodule SlapWeb.ChatRoomLive do
     |> maybe_update_current_user(user)
     |> push_event("update_avatar", %{user_id: user.id, avatar_path: user.avatar_path})
     |> noreply()
+  end
+
+  def handle_info(
+        %{
+          event: "voice_call_request",
+          payload: %{from_user_id: user_id, from_username: username, call_id: call_id}
+        },
+        socket
+      ) do
+    # Set the incoming call information to show notification
+    {:noreply,
+     assign(socket,
+       incoming_call: %{
+         user_id: user_id,
+         username: username,
+         call_id: call_id
+       }
+     )}
+  end
+
+  def handle_event("accept_call", _, socket) do
+    call = socket.assigns.incoming_call
+    # Redirect to voice chat with the caller
+    {:noreply,
+     socket
+     |> assign(incoming_call: nil)
+     |> redirect(to: ~p"/voice-chat/#{call.user_id}")}
+  end
+
+  def handle_event("reject_call", _, socket) do
+    call = socket.assigns.incoming_call
+    call_topic = "voice_call:#{call.call_id}"
+
+    # Notify caller that call was rejected
+    SlapWeb.Endpoint.broadcast(call_topic, "call_rejected", %{
+      by_user_id: socket.assigns.current_user.id
+    })
+
+    {:noreply, assign(socket, incoming_call: nil)}
   end
 
   defp highlight_message(socket, message) do

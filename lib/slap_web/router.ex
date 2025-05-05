@@ -71,6 +71,7 @@ defmodule SlapWeb.Router do
       live "/rooms/:id/edit", ChatRoomLive.Edit
       live "/users/settings", UserSettingsLive, :edit
       live "/users/settings/confirm_email/:token", UserSettingsLive, :confirm_email
+      live "/voice-chat/:target_user_id", VoiceChatLive
     end
   end
 
