@@ -70,7 +70,8 @@ defmodule SlapWeb.VoiceChatLive do
       by_user_id: socket.assigns.current_user.id
     })
 
-    {:noreply, redirect(socket, to: ~p"/rooms")}
+    # Push a JavaScript command to close the window
+    {:noreply, push_event(socket, "close_window", %{})}
   end
 
   def handle_event("signal", %{"data" => signal_data}, socket) do
@@ -96,7 +97,8 @@ defmodule SlapWeb.VoiceChatLive do
       by_user_id: socket.assigns.current_user.id
     })
 
-    {:noreply, redirect(socket, to: ~p"/rooms")}
+    # Push a JavaScript command to close the window
+    {:noreply, push_event(socket, "close_window", %{})}
   end
 
   # Handle incoming signal from the other peer
@@ -163,110 +165,125 @@ defmodule SlapWeb.VoiceChatLive do
 
   def render(assigns) do
     ~H"""
-    <div class="voice-chat-window">
-      <div class="flex justify-between items-center p-4 border-b border-gray-200">
-        <div class="flex items-center">
-          <div class="font-bold">Voice Call</div>
-          <div class="ml-2 text-sm text-gray-600">
-            <%= if @call_status == "incoming" do %>
-              from {@caller.username}
-            <% else %>
-              with {@target_user.username}
+    <div class="min-h-screen bg-gray-100 flex flex-col">
+      <div class="bg-white shadow-sm border-b border-gray-200 py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+          <div class="flex items-center">
+            <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
+            <div class="ml-3 text-sm text-gray-600">
+              <%= if @call_status == "incoming" do %>
+                from {@caller.username}
+              <% else %>
+                with {@target_user.username}
+              <% end %>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <%= if @call_status in ["connected", "connecting"] do %>
+              <button
+                phx-click="end_call"
+                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex items-center"
+              >
+                <.icon name="hero-phone-x-mark" class="h-5 w-5 mr-2" /> End Call
+              </button>
             <% end %>
+            <button
+              onclick="window.close()"
+              class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+            >
+              Close Window
+            </button>
           </div>
         </div>
-        <%= if @call_status in ["connected", "connecting"] do %>
-          <button
-            phx-click="end_call"
-            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-          >
-            End Call
-          </button>
-        <% end %>
       </div>
 
-      <div class="p-4">
-        <div class={"call-status-badge #{status_color(@call_status)}"}>
-          {status_message(@call_status)}
-        </div>
+      <div class="container mx-auto px-4 py-8 flex-1 flex flex-col items-center justify-center">
+        <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full">
+          <div class="text-center">
+            <div class={"call-status-badge mb-6 #{status_color(@call_status)}"}>
+              {status_message(@call_status)}
+            </div>
 
-        <%= if @call_status == "connected" do %>
-          <div class="audio-wave mt-2">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        <% end %>
-      </div>
-
-      <div
-        id="voice-chat-container"
-        phx-hook="VoiceChat"
-        data-user-id={@current_user.id}
-        data-target-id={@target_user_id}
-        data-call-id={@call_id}
-        data-call-status={@call_status}
-        class="flex flex-col items-center justify-center h-64"
-      >
-        <div class="mb-4">
-          <div class={"w-20 h-20 rounded-full flex items-center justify-center #{status_bg_color(@call_status)}"}>
-            <.icon name="hero-microphone" class="h-10 w-10 text-gray-500" />
-          </div>
-        </div>
-
-        <div class="mt-4 text-center">
-          <%= cond do %>
-            <% @call_status == "init" -> %>
-              <button
-                phx-click="request_call"
-                class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full"
-              >
-                Start Call
-              </button>
-            <% @call_status == "incoming" -> %>
-              <div class="flex space-x-3">
-                <button
-                  phx-click="accept_call"
-                  class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full"
-                >
-                  Accept
-                </button>
-                <button
-                  phx-click="reject_call"
-                  class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full"
-                >
-                  Reject
-                </button>
+            <div class="mb-8">
+              <div class={"w-32 h-32 rounded-full flex items-center justify-center mx-auto #{status_bg_color(@call_status)}"}>
+                <.icon name="hero-microphone" class="h-16 w-16 text-gray-500" />
               </div>
-            <% @call_status == "rejected" -> %>
-              <button
-                phx-click="end_call"
-                class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-full"
-              >
-                Close
-              </button>
-            <% @call_status == "ended" -> %>
-              <button
-                phx-click="end_call"
-                class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-full"
-              >
-                Close
-              </button>
-            <% String.starts_with?(@call_status, "error:") -> %>
-              <div class="mb-2 text-red-600 text-sm">
-                {String.replace_prefix(@call_status, "error: ", "")}
+
+              <%= if @call_status == "connected" do %>
+                <div class="audio-wave mt-4">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              <% end %>
+            </div>
+
+            <div
+              id="voice-chat-container"
+              phx-hook="VoiceChat"
+              data-user-id={@current_user.id}
+              data-target-id={@target_user_id}
+              data-call-id={@call_id}
+              data-call-status={@call_status}
+              class="flex flex-col items-center justify-center"
+            >
+              <div class="mt-4 text-center">
+                <%= cond do %>
+                  <% @call_status == "init" -> %>
+                    <button
+                      phx-click="request_call"
+                      class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"
+                    >
+                      Start Call
+                    </button>
+                  <% @call_status == "incoming" -> %>
+                    <div class="flex space-x-4">
+                      <button
+                        phx-click="accept_call"
+                        class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full text-lg flex items-center"
+                      >
+                        <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
+                      </button>
+                      <button
+                        phx-click="reject_call"
+                        class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full text-lg flex items-center"
+                      >
+                        <.icon name="hero-x-mark" class="h-5 w-5 mr-2" /> Reject
+                      </button>
+                    </div>
+                  <% @call_status == "rejected" -> %>
+                    <button
+                      phx-click="end_call"
+                      class="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded-full text-lg"
+                    >
+                      Close
+                    </button>
+                  <% @call_status == "ended" -> %>
+                    <button
+                      phx-click="end_call"
+                      class="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded-full text-lg"
+                    >
+                      Close
+                    </button>
+                  <% String.starts_with?(@call_status, "error:") -> %>
+                    <div class="mb-4 text-red-600 text-sm">
+                      {String.replace_prefix(@call_status, "error: ", "")}
+                    </div>
+                    <button
+                      phx-click="request_call"
+                      class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"
+                    >
+                      Try Again
+                    </button>
+                  <% true -> %>
+                    <!-- No buttons for other states -->
+                <% end %>
               </div>
-              <button
-                phx-click="request_call"
-                class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full"
-              >
-                Try Again
-              </button>
-            <% true -> %>
-              <!-- No buttons for other states -->
-          <% end %>
+            </div>
+          </div>
         </div>
       </div>
     </div>

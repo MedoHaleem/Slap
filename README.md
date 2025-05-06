@@ -15,6 +15,9 @@ Welcome to "Slap," a project designed as a Slack clone to practice Phoenix LiveV
 - **Message Management:** Users can delete their own messages.
 - **Thread Expansion:** Expand message threads to view more details.
 - **Message Reactions:** React to other user's messages.
+- **File Sharing:** Upload and share multiple PDFs in messages.
+- **Voice Chat:** Real-time voice calls between users with WebRTC.
+
 
 ## ScreenShot
 

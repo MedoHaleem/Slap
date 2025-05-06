@@ -52,6 +52,16 @@ export const VoiceChatHook = {
       console.log("Initializing voice chat as", initiator ? "initiator" : "receiver");
       this.startCall(initiator);
     });
+    
+    // Listen for close window event
+    this.handleEvent('close_window', () => {
+      console.log("Closing window");
+      if (this.voiceChat) {
+        this.voiceChat.destroy();
+        this.voiceChat = null;
+      }
+      window.close();
+    });
   },
 
   async startCall(initiator = false) {

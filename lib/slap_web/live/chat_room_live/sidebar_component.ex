@@ -122,13 +122,14 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
       <%= if @online do %>
-        <button
-          phx-click={JS.navigate(~p"/voice-chat/#{@user.id}")}
+        <a
+          href={~p"/voice-chat/#{@user.id}"}
+          target="_blank"
           class="voice-chat-btn opacity-0 group-hover:opacity-100"
-          title="Start voice chat"
+          title="Start voice chat in new window"
         >
           <.icon name="hero-microphone" class="h-4 w-4 text-gray-600 hover:text-gray-800" />
-        </button>
+        </a>
       <% end %>
     </div>
     """

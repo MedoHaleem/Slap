@@ -13,27 +13,7 @@
     transition: background-color 3s ease;
   }
 
-.voice-chat-window {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 350px;
-  height: 450px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  padding: 0;
-  z-index: 1000;
-  overflow: hidden;
-}
-
-.call-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
+/* Voice chat button in user list */
 .voice-chat-btn {
   padding: 0.5rem;
   border-radius: 50%;
@@ -45,6 +25,7 @@
   background: rgba(0,0,0,0.05);
 }
 
+/* Voice chat status indicators */
 .call-status-badge {
   display: inline-block;
   padding: 0.5rem 1rem;
