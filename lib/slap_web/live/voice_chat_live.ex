@@ -28,6 +28,23 @@ defmodule SlapWeb.VoiceChatLive do
      )}
   end
 
+  def handle_event("open_voice_chat", %{"target_user_id" => target_user_id, "call_id" => call_id}, socket) do
+    # Create a new window for the voice chat
+    {:noreply,
+     socket
+     |> assign(
+       incoming_call: %{
+         user_id: target_user_id,
+         username: get_target_user(target_user_id).username,
+         call_id: call_id
+       }
+     )}
+  end
+
+  defp get_target_user(user_id) do
+    Slap.Accounts.get_user!(user_id)
+  end
+
   defp get_target_user(user_id) do
     Slap.Accounts.get_user!(user_id)
   end
@@ -255,12 +272,20 @@ defmodule SlapWeb.VoiceChatLive do
                       </button>
                     </div>
                   <% @call_status == "rejected" -> %>
-                    <button
-                      phx-click="end_call"
-                      class="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded-full text-lg"
-                    >
-                      Close
-                    </button>
+                    <div class="flex flex-col space-y-4">
+                      <button
+                        phx-click="end_call"
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded-full text-lg"
+                      >
+                        Close
+                      </button>
+                      <button
+                        phx-click="open_voice_chat"
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"
+                      >
+                        Open in New Window
+                      </button>
+                    </div>
                   <% @call_status == "ended" -> %>
                     <button
                       phx-click="end_call"

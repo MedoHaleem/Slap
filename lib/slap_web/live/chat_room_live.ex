@@ -409,11 +409,14 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("accept_call", _, socket) do
     call = socket.assigns.incoming_call
-    # Redirect to voice chat with the caller
+    # Open voice chat in new window with the caller
     {:noreply,
      socket
      |> assign(incoming_call: nil)
-     |> redirect(to: ~p"/voice-chat/#{call.user_id}")}
+     |> push_event("open_voice_chat", %{
+       target_user_id: call.user_id,
+       call_id: call.call_id
+     })}
   end
 
   def handle_event("reject_call", _, socket) do

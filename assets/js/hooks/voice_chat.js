@@ -11,7 +11,7 @@ export const VoiceChatHook = {
     this.pendingOperation = null;
     this.signalRetries = 0;
     this.maxRetries = 3;
-    
+
     // Listen for signal events from the server
     this.handleEvent('voice:receive_signal', ({ signal, from }) => {
       console.log("Received signal from server", from, "type:", signal.type);
@@ -21,7 +21,7 @@ export const VoiceChatHook = {
         console.log("Ignoring signal from self");
         return;
       }
-      
+
       if (this.voiceChat) {
         try {
           this.voiceChat.signal(signal);
@@ -46,13 +46,13 @@ export const VoiceChatHook = {
         });
       }
     });
-    
+
     // Listen for initialization request
     this.handleEvent('voice:initialize', ({ initiator }) => {
       console.log("Initializing voice chat as", initiator ? "initiator" : "receiver");
       this.startCall(initiator);
     });
-    
+
     // Listen for close window event
     this.handleEvent('close_window', () => {
       console.log("Closing window");
@@ -61,6 +61,42 @@ export const VoiceChatHook = {
         this.voiceChat = null;
       }
       window.close();
+    });
+
+    window.addEventListener("phx:open_voice_call_window", (e) => {
+      const { url, call_id } = e.detail;
+      const windowName = `voice_call_${call_id || new Date().getTime()}`; // Unique name helps manage windows
+      const windowFeatures = "width=450,height=700,resizable=yes,scrollbars=yes,status=yes,noopener,noreferrer";
+      window.open(url, windowName, windowFeatures);
+    });
+    
+    // Listen for open voice chat event
+    this.handleEvent('open_voice_chat', ({ target_user_id, call_id }) => {
+      console.log("Opening voice chat in new window");
+      
+      // Open a new window for the voice chat
+      const newWindow = window.open(`/voice-chat/${target_user_id}`, 'voiceChatWindow');
+      
+      if (newWindow) {
+        // Pass the call ID to the new window
+        newWindow.addEventListener('load', () => {
+          console.log("New window loaded, sending call ID");
+          this.pushEvent('set_call_id', { call_id });
+        });
+        
+        // Close current window after successful open
+        setTimeout(() => {
+          console.log("Closing current window after opening voice chat");
+          if (this.voiceChat) {
+            this.voiceChat.destroy();
+            this.voiceChat = null;
+          }
+          window.close();
+        }, 1000);
+      } else {
+        console.error("Failed to open new window - popup blocker?");
+        this.pushEvent('update_status', { status: 'error: Could not open voice chat in new window' });
+      }
     });
   },
 
