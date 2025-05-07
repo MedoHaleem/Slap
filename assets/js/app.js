@@ -59,3 +59,11 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Global event listener for opening voice chat windows
+window.addEventListener("phx:open_voice_call_window", (e) => {
+  const { url, call_id } = e.detail;
+  const windowName = `voice_call_${call_id || new Date().getTime()}`; // Unique name helps manage windows
+  const windowFeatures = "width=450,height=700,resizable=yes,scrollbars=yes,status=yes,noopener,noreferrer";
+  window.open(url, windowName, windowFeatures);
+});
+

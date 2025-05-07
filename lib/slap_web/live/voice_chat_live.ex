@@ -28,7 +28,11 @@ defmodule SlapWeb.VoiceChatLive do
      )}
   end
 
-  def handle_event("open_voice_chat", %{"target_user_id" => target_user_id, "call_id" => call_id}, socket) do
+  def handle_event(
+        "open_voice_chat",
+        %{"target_user_id" => target_user_id, "call_id" => call_id},
+        socket
+      ) do
     # Create a new window for the voice chat
     {:noreply,
      socket
@@ -182,9 +186,9 @@ defmodule SlapWeb.VoiceChatLive do
 
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gray-100 flex flex-col">
-      <div class="bg-white shadow-sm border-b border-gray-200 py-4">
-        <div class="container mx-auto px-4 flex justify-between items-center">
+    <div class="relative min-h-screen bg-gray-100 flex flex-col w-full">
+      <div class="absolute top-0 left-0 right-0 bg-white shadow-sm border-b border-gray-200 py-4 z-10">
+        <div class="max-w-md mx-auto px-4 flex justify-between items-center">
           <div class="flex items-center">
             <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
             <div class="ml-3 text-sm text-gray-600">
@@ -215,8 +219,8 @@ defmodule SlapWeb.VoiceChatLive do
         </div>
       </div>
 
-      <div class="container mx-auto px-4 py-8 flex-1 flex flex-col items-center justify-center">
-        <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full">
+      <div class="w-full flex items-center justify-center min-h-screen pt-20">
+        <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-auto">
           <div class="text-center">
             <div class={"call-status-badge mb-6 #{status_color(@call_status)}"}>
               {status_message(@call_status)}

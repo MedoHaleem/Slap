@@ -413,8 +413,8 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply,
      socket
      |> assign(incoming_call: nil)
-     |> push_event("open_voice_chat", %{
-       target_user_id: call.user_id,
+     |> push_event("phx:open_voice_call_window", %{
+       url: "/voice-chat/#{call.user_id}",
        call_id: call.call_id
      })}
   end
