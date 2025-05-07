@@ -409,14 +409,16 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("accept_call", _, socket) do
     call = socket.assigns.incoming_call
-    # Open voice chat in new window with the caller
+
+    # The target_user_id for VoiceChatLive is the ID of the user who INITIATED the call (the caller).
+    # The current user is accepting, so they will be the callee on that page.
+    voice_chat_url = "/voice-chat/#{call.user_id}?accepted_call=true"
+
+    # Redirect to the voice chat page, indicating the call was just accepted.
     {:noreply,
      socket
      |> assign(incoming_call: nil)
-     |> push_event("phx:open_voice_call_window", %{
-       url: "/voice-chat/#{call.user_id}",
-       call_id: call.call_id
-     })}
+     |> push_navigate(to: voice_chat_url)}
   end
 
   def handle_event("reject_call", _, socket) do
