@@ -64,6 +64,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
               :for={user <- @users}
               user={user}
               online={OnlineUsers.online?(@online_users, user.id)}
+              current_user={@current_user}
             />
           </div>
         </div>
@@ -107,6 +108,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
 
   attr :user, User, required: true
   attr :online, :boolean, default: false
+  attr :current_user, User, required: true
 
   defp user(assigns) do
     ~H"""
@@ -121,7 +123,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         </div>
         <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
-      <%= if @online do %>
+      <%= if @online && @user.id != @current_user.id do %>
         <a
           href={~p"/voice-chat/#{@user.id}"}
           target="_blank"

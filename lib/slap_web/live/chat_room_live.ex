@@ -58,6 +58,7 @@ defmodule SlapWeb.ChatRoomLive do
       online_users={@online_users}
       current_room_id={@room.id}
       current_room={@room}
+      current_user={@current_user}
     />
     <div class="flex flex-col grow shadow-lg">
       <.live_component
@@ -113,10 +114,12 @@ defmodule SlapWeb.ChatRoomLive do
             <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
               <.icon name="hero-phone" class="h-8 w-8 text-purple-600" />
             </div>
+            
             <h3 class="text-lg font-bold">Incoming Call</h3>
+            
             <p class="text-gray-600">{@incoming_call.username} is calling you</p>
           </div>
-
+          
           <div class="flex space-x-3 justify-center">
             <button
               phx-click="accept_call"
@@ -124,6 +127,7 @@ defmodule SlapWeb.ChatRoomLive do
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
             </button>
+            
             <button
               phx-click="reject_call"
               class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full flex items-center"
@@ -141,7 +145,7 @@ defmodule SlapWeb.ChatRoomLive do
       on_cancel={JS.navigate(~p"/rooms/#{@room}")}
     >
       <.header>New chat room</.header>
-
+      
       <.live_component
         module={SlapWeb.ChatRoomLive.FormComponent}
         id="new-room-form-component"
