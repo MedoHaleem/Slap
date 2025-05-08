@@ -59,3 +59,22 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Global event listener for opening voice chat windows
+window.addEventListener("phx:open_voice_call_window", (e) => {
+  console.log("GLOBAL: phx:open_voice_call_window event received", e.detail); // Debug log
+  const { url, call_id } = e.detail;
+  if (!url) {
+    console.error("GLOBAL: URL is missing in event detail for phx:open_voice_call_window");
+    return;
+  }
+  const windowName = `voice_call_${call_id || new Date().getTime()}`; 
+  const windowFeatures = "width=450,height=700,resizable=yes,scrollbars=yes,status=yes,noopener,noreferrer";
+  console.log(`GLOBAL: Attempting to open window: URL=${url}, Name=${windowName}`); // Debug log
+  const newWindow = window.open(url, windowName, windowFeatures);
+  if (newWindow) {
+    console.log("GLOBAL: Window opened successfully or popup blocker might still intervene.");
+  } else {
+    console.error("GLOBAL: window.open returned null or undefined. Popup likely blocked without a chance for user interaction.");
+  }
+});
+

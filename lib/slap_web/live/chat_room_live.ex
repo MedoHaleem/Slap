@@ -58,6 +58,7 @@ defmodule SlapWeb.ChatRoomLive do
       online_users={@online_users}
       current_room_id={@room.id}
       current_room={@room}
+      current_user={@current_user}
     />
     <div class="flex flex-col grow shadow-lg">
       <.live_component
@@ -113,7 +114,9 @@ defmodule SlapWeb.ChatRoomLive do
             <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
               <.icon name="hero-phone" class="h-8 w-8 text-purple-600" />
             </div>
+
             <h3 class="text-lg font-bold">Incoming Call</h3>
+
             <p class="text-gray-600">{@incoming_call.username} is calling you</p>
           </div>
 
@@ -124,6 +127,7 @@ defmodule SlapWeb.ChatRoomLive do
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
             </button>
+
             <button
               phx-click="reject_call"
               class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full flex items-center"
@@ -409,12 +413,17 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("accept_call", _, socket) do
     call = socket.assigns.incoming_call
-    # Open voice chat in new window with the caller
+
+    # The target_user_id for VoiceChatLive is the ID of the user who INITIATED the call (the caller).
+    # The current user is accepting, so they will be the callee on that page.
+    voice_chat_url = "/voice-chat/#{call.user_id}?accepted_call=true"
+
+    # Redirect to the voice chat page, indicating the call was just accepted.
     {:noreply,
      socket
      |> assign(incoming_call: nil)
-     |> push_event("open_voice_chat", %{
-       target_user_id: call.user_id,
+     |> push_event("phx:open_voice_call_window", %{
+       url: "/voice-chat/#{call.user_id}",
        call_id: call.call_id
      })}
   end

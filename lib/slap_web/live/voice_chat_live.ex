@@ -2,33 +2,66 @@ defmodule SlapWeb.VoiceChatLive do
   use SlapWeb, :live_view
   alias Phoenix.PubSub
 
-  def mount(%{"target_user_id" => target_user_id}, _session, socket) do
+  def mount(%{"target_user_id" => target_user_id_param} = params, _session, socket) do
     current_user_id = socket.assigns.current_user.id
 
+    # target_user_id_param is from the path, ensure it's an integer for call_id calculation if current_user_id is int
+    # Assuming current_user.id is an integer. If it can be a string, adjust accordingly.
+    target_user_id_for_calc = String.to_integer(target_user_id_param)
+
+    accepted_call = params["accepted_call"] == "true"
+
+    # Create a unique channel for this call, consistently for both users
+    call_id =
+      "#{min(current_user_id, target_user_id_for_calc)}_#{max(current_user_id, target_user_id_for_calc)}"
+
     if connected?(socket) do
-      topic = "voice:#{current_user_id}"
-      SlapWeb.Endpoint.subscribe(topic)
+      user_topic = "voice:#{current_user_id}"
+      SlapWeb.Endpoint.subscribe(user_topic)
 
-      # Create a unique channel for this call
-      call_id =
-        "#{min(current_user_id, String.to_integer(target_user_id))}_#{max(current_user_id, String.to_integer(target_user_id))}"
-
-      call_topic = "voice_call:#{call_id}"
-      SlapWeb.Endpoint.subscribe(call_topic)
+      call_topic_for_subscribe = "voice_call:#{call_id}"
+      SlapWeb.Endpoint.subscribe(call_topic_for_subscribe)
     end
 
-    {:ok,
-     assign(socket,
-       target_user_id: target_user_id,
-       call_status: "init",
-       call_role: nil,
-       target_user: get_target_user(target_user_id),
-       call_id:
-         "#{min(current_user_id, String.to_integer(target_user_id))}_#{max(current_user_id, String.to_integer(target_user_id))}"
-     )}
+    socket_with_basics =
+      assign(socket,
+        # Keep original param for get_target_user if it expects string
+        target_user_id: target_user_id_param,
+        call_id: call_id,
+        # Uses the string ID from param
+        target_user: get_target_user(target_user_id_param)
+      )
+
+    if accepted_call do
+      # This user is the callee and has just accepted the call via ChatRoomLive.
+      # They are now landing on the VoiceChatLive page. Auto-initiate the call.
+
+      call_topic_for_broadcast = "voice_call:#{call_id}"
+
+      SlapWeb.Endpoint.broadcast(call_topic_for_broadcast, "call_accepted", %{
+        # The current user (callee) accepted
+        by_user_id: current_user_id
+      })
+
+      {:ok,
+       socket_with_basics
+       |> assign(call_status: "connecting", call_role: "callee")
+       |> push_event("voice:initialize", %{initiator: false})}
+    else
+      # Standard init flow (user navigated here directly, or is initiating a new call from this page)
+      {:ok,
+       assign(socket_with_basics,
+         call_status: "init",
+         call_role: nil
+       )}
+    end
   end
 
-  def handle_event("open_voice_chat", %{"target_user_id" => target_user_id, "call_id" => call_id}, socket) do
+  def handle_event(
+        "open_voice_chat",
+        %{"target_user_id" => target_user_id, "call_id" => call_id},
+        socket
+      ) do
     # Create a new window for the voice chat
     {:noreply,
      socket
@@ -182,9 +215,9 @@ defmodule SlapWeb.VoiceChatLive do
 
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gray-100 flex flex-col">
-      <div class="bg-white shadow-sm border-b border-gray-200 py-4">
-        <div class="container mx-auto px-4 flex justify-between items-center">
+    <div class="relative min-h-screen bg-gray-100 flex flex-col w-full">
+      <div class="absolute top-0 left-0 right-0 bg-white shadow-sm border-b border-gray-200 py-4 z-10">
+        <div class="max-w-md mx-auto px-4 flex justify-between items-center">
           <div class="flex items-center">
             <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
             <div class="ml-3 text-sm text-gray-600">
@@ -215,8 +248,8 @@ defmodule SlapWeb.VoiceChatLive do
         </div>
       </div>
 
-      <div class="container mx-auto px-4 py-8 flex-1 flex flex-col items-center justify-center">
-        <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full">
+      <div class="w-full flex items-center justify-center min-h-screen pt-20">
+        <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-auto">
           <div class="text-center">
             <div class={"call-status-badge mb-6 #{status_color(@call_status)}"}>
               {status_message(@call_status)}
