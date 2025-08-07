@@ -122,7 +122,11 @@ defmodule SlapWeb.ChatRoomLive do
 
           <div class="flex space-x-3 justify-center">
             <button
+              id="accept-call-button"
               phx-click="accept_call"
+              phx-hook="VoiceChat"
+              data-url={"/voice-chat/#{@incoming_call.user_id}?accepted_call=true"}
+              data-call-id={@incoming_call.call_id}
               class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center"
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
@@ -414,9 +418,17 @@ defmodule SlapWeb.ChatRoomLive do
   def handle_event("accept_call", _, socket) do
     call = socket.assigns.incoming_call
 
+    # Debug logging
+    IO.puts("DEBUG: accept_call event received")
+    IO.puts("DEBUG: Call details - user_id: #{call.user_id}, username: #{call.username}, call_id: #{call.call_id}")
+
     # The target_user_id for VoiceChatLive is the ID of the user who INITIATED the call (the caller).
     # The current user is accepting, so they will be the callee on that page.
     voice_chat_url = "/voice-chat/#{call.user_id}?accepted_call=true"
+
+    # Debug logging for event push
+    IO.puts("DEBUG: Pushing phx:open_voice_call_window event")
+    IO.puts("DEBUG: Event payload - url: /voice-chat/#{call.user_id}, call_id: #{call.call_id}")
 
     # Redirect to the voice chat page, indicating the call was just accepted.
     {:noreply,

@@ -24,7 +24,7 @@ import topbar from "../vendor/topbar"
 import RoomMessages from "./hooks/RoomMessages"
 import ChatMessageTextArea from "./hooks/ChatMessageTextArea"
 import Thread from "./hooks/Thread"
-import { VoiceChatHook } from "./hooks/voice_chat"
+import { VoiceChatHook } from "./hooks/voice_chat?v=1.0.1"
 
 const hooks = {
   RoomMessages,
@@ -36,7 +36,12 @@ let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("
 const dateTimeFormat = new Intl.DateTimeFormat();
 const resolvedOptions = dateTimeFormat.resolvedOptions();
 
+// Add cache-busting parameter to force reload of assets when needed
+// This can be incremented when we need to force clients to reload
+const CACHE_BUST_VERSION = "1.0.1";
+
 console.log("Locale-based Time Zone:", resolvedOptions.timeZone);
+console.log("Cache-bust version:", CACHE_BUST_VERSION);
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks,
   longPollFallbackMs: 2500,

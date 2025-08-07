@@ -1,4 +1,5 @@
-import { VoiceChat } from '../components/VoiceChat';
+// Add cache-busting parameter to ensure fresh version is loaded
+import { VoiceChat } from '../components/VoiceChat?v=1.0.1';
 
 export const VoiceChatHook = {
   mounted() {
@@ -14,7 +15,8 @@ export const VoiceChatHook = {
 
     // Listen for signal events from the server
     this.handleEvent('voice:receive_signal', ({ signal, from }) => {
-      console.log("Received signal from server", from, "type:", signal.type);
+      console.log("SIGNAL RECEIVED: Received signal from server", from, "type:", signal.type);
+      console.log("SIGNAL DETAILS:", JSON.stringify(signal, null, 2));
       
       // Don't process our own signals
       if (from.toString() === this.userId) {
@@ -63,41 +65,72 @@ export const VoiceChatHook = {
       window.close();
     });
 
-    window.addEventListener("phx:open_voice_call_window", (e) => {
-      const { url, call_id } = e.detail;
-      const windowName = `voice_call_${call_id || new Date().getTime()}`; // Unique name helps manage windows
-      const windowFeatures = "width=450,height=700,resizable=yes,scrollbars=yes,status=yes,noopener,noreferrer";
-      window.open(url, windowName, windowFeatures);
-    });
-    
-    // Listen for open voice chat event
-    this.handleEvent('open_voice_chat', ({ target_user_id, call_id }) => {
-      console.log("Opening voice chat in new window");
-      
-      // Open a new window for the voice chat
-      const newWindow = window.open(`/voice-chat/${target_user_id}`, 'voiceChatWindow');
-      
-      if (newWindow) {
-        // Pass the call ID to the new window
-        newWindow.addEventListener('load', () => {
-          console.log("New window loaded, sending call ID");
-          this.pushEvent('set_call_id', { call_id });
-        });
+    // Function to open voice call window directly from user interaction
+    this.openVoiceCallWindow = (url, callId) => {
+      try {
+        console.log("VOICE_CHAT_HOOK: Opening voice call window directly from user interaction");
+        console.log(`VOICE_CHAT_HOOK: Attempting to open window: URL=${url}, CallID=${callId}`); // Debug log
         
-        // Close current window after successful open
-        setTimeout(() => {
-          console.log("Closing current window after opening voice chat");
-          if (this.voiceChat) {
-            this.voiceChat.destroy();
-            this.voiceChat = null;
+        if (!url || !callId) {
+          console.error("VOICE_CHAT_HOOK: Missing required parameters for opening voice call window");
+          return;
+        }
+        
+        const windowName = `voice_call_${callId || new Date().getTime()}`; // Unique name helps manage windows
+        const windowFeatures = "width=450,height=700,resizable=yes,scrollbars=yes,status=yes,noopener,noreferrer";
+        const newWindow = window.open(url, windowName, windowFeatures);
+        
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'boolean') {
+          console.error("VOICE_CHAT_HOOK: Failed to open voice call window - popup blocker may be blocking it");
+          console.log("VOICE_CHAT_HOOK: User interaction context available - popup blocker should allow this");
+        } else {
+          console.log("VOICE_CHAT_HOOK: Voice call window opened successfully");
+        }
+      } catch (error) {
+        console.error("VOICE_CHAT_HOOK: Error opening voice call window:", error);
+      }
+    };
+
+    // Fallback event listener for backward compatibility
+    window.addEventListener("phx:open_voice_call_window", (e) => {
+      console.log("VOICE_CHAT_HOOK: phx:open_voice_call_window event received", e.detail); // Debug log
+      const { url, call_id } = e.detail;
+      this.openVoiceCallWindow(url, call_id);
+    });
+
+    // Handle direct button click for accepting calls (user interaction context)
+    this.el.addEventListener('click', (event) => {
+      try {
+        // Check if this is the accept call button
+        if (event.target.matches('button[data-url][data-call-id]') ||
+            event.target.closest('button[data-url][data-call-id]')) {
+          
+          const button = event.target.matches('button[data-url][data-call-id]')
+            ? event.target
+            : event.target.closest('button[data-url][data-call-id]');
+          
+          const url = button.dataset.url;
+          const callId = button.dataset.callId;
+          
+          console.log("VOICE_CHAT_HOOK: Direct button click detected");
+          console.log(`VOICE_CHAT_HOOK: Button data - URL=${url}, CallID=${callId}`);
+          
+          // Validate required data
+          if (!url || !callId) {
+            console.error("VOICE_CHAT_HOOK: Missing required data attributes on button");
+            return;
           }
-          window.close();
-        }, 1000);
-      } else {
-        console.error("Failed to open new window - popup blocker?");
-        this.pushEvent('update_status', { status: 'error: Could not open voice chat in new window' });
+          
+          // Call the window opening function directly from user interaction
+          this.openVoiceCallWindow(url, callId);
+        }
+      } catch (error) {
+        console.error("VOICE_CHAT_HOOK: Error in button click handler:", error);
       }
     });
+    
+    // NOTE: Removed conflicting open_voice_chat handler that was causing immediate window closure
+    // The openVoiceCallWindow function and direct button click handler should handle window opening
   },
 
   async startCall(initiator = false) {
@@ -114,70 +147,65 @@ export const VoiceChatHook = {
     }
     
     console.log("Starting voice chat");
+    console.log("Voice chat context - userId:", this.userId, "targetId:", this.targetId, "callId:", this.callId);
+    console.log("Voice chat initialization - initiator:", initiator, "window open:", !!window.open);
     this.pushEvent('update_status', { status: "connecting" });
     
     // Create a promise we can track
     this.pendingOperation = new Promise(async (resolve) => {
       try {
+        // Create VoiceChat instance with only the initiator parameter
         this.voiceChat = new VoiceChat(initiator);
         
-        // Set up event handlers
+        // Set up instance properties
+        this.voiceChat.userId = this.userId;
+        this.voiceChat.targetId = this.targetId;
+        this.voiceChat.callId = this.callId;
+        
+        // Register event handlers using the on() method
+        this.voiceChat.on('statusChange', (status) => {
+          console.log("Voice chat status changed:", status);
+          this.pushEvent('update_status', { status });
+        });
+        
+        this.voiceChat.on('signal', (signal) => {
+          console.log("SIGNAL TO SERVER: Sending signal to server");
+          console.log("SIGNAL TO SERVER: Signal type:", signal.type);
+          console.log("SIGNAL TO SERVER: Call ID:", this.callId);
+          console.log("SIGNAL TO SERVER: User ID:", this.userId);
+          console.log("SIGNAL TO SERVER: Target ID:", this.targetId);
+          this.pushEvent('signal', { signal });
+        });
+        
         this.voiceChat.on('connected', () => {
-          console.log("Call connected successfully");
-          this.pushEvent('update_status', { status: 'connected' });
-          
-          // Play a sound to notify the user
-          this.playSound('connected');
-          
-          // Flash the title bar to get the user's attention
-          this.flashTitleBar("Call Connected");
+          console.log("CALL CONNECTED: Voice chat connection established successfully!");
+          this.pushEvent('update_status', { status: "connected" });
         });
         
         this.voiceChat.on('disconnected', () => {
-          console.log("Call disconnected");
-          this.pushEvent('update_status', { status: 'disconnected' });
-          
-          // Play disconnect sound
-          this.playSound('disconnected');
-        });
-        
-        this.voiceChat.on('error', (message) => {
-          console.error("Voice chat error:", message);
-          this.pushEvent('update_status', { status: `error: ${message}` });
-          
-          // Play error sound
-          this.playSound('error');
-        });
-        
-        // Start the peer connection
-        const success = await this.voiceChat.init();
-        
-        if (success) {
-          // Set up the signal event handler
-          this.signalHandler = (e) => {
-            try {
-              console.log("Sending signal to server", e.detail.signal.type);
-              this.pushEvent('signal', { data: e.detail.signal });
-            } catch (err) {
-              console.error("Error sending signal:", err);
-            }
-          };
-          
-          window.addEventListener('voice:signal', this.signalHandler);
-          resolve(true);
-        } else {
-          console.error("Failed to initialize voice chat");
+          console.log("Voice chat disconnected");
+          this.pushEvent('update_status', { status: "disconnected" });
           this.voiceChat = null;
-          this.pushEvent('update_status', { status: 'error: Failed to initialize call' });
-          resolve(false);
-        }
-      } catch (err) {
-        console.error("Error in startCall:", err);
-        this.pushEvent('update_status', { status: `error: ${err.message || 'Unknown error starting call'}` });
-        this.voiceChat = null;
-        resolve(false);
-      } finally {
+        });
+        
+        this.voiceChat.on('error', (error) => {
+          console.error("Voice chat error:", error);
+          this.pushEvent('update_status', { status: "error" });
+        });
+
+        // Wait for initialization to complete
+        await this.voiceChat.init();
+        console.log("Voice chat initialized successfully");
+        
+        // Clear pending operation
         this.pendingOperation = null;
+        
+        return true;
+      } catch (error) {
+        console.error("Failed to initialize voice chat:", error);
+        this.pushEvent('update_status', { status: "error" });
+        this.pendingOperation = null;
+        throw error;
       }
     });
     
