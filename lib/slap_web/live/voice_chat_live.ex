@@ -108,12 +108,7 @@ defmodule SlapWeb.VoiceChatLive do
 
   def handle_event("signal", %{"signal" => signal_data}, socket) do
 
-    # Debug logging
-    IO.puts("SERVER SIGNAL: Received signal from user #{socket.assigns.current_user.id}")
     call_topic = topic_call(socket.assigns.call_id)
-    IO.puts("SERVER SIGNAL: Broadcasting to topic #{call_topic}")
-    IO.puts("SERVER SIGNAL: Signal type: #{signal_data["type"]}")
-    IO.puts("SERVER SIGNAL: Call ID: #{socket.assigns.call_id}")
 
     SlapWeb.Endpoint.broadcast(call_topic, "voice_signal", %{
       signal: signal_data,
@@ -140,11 +135,6 @@ defmodule SlapWeb.VoiceChatLive do
 
   # Handle incoming signal from the other peer
   def handle_info(%{event: "voice_signal", payload: payload}, socket) do
-    # Debug logging
-    IO.puts("SERVER SIGNAL: Received voice_signal event for user #{socket.assigns.current_user.id}")
-    IO.puts("SERVER SIGNAL: Signal from user #{payload.from}")
-    IO.puts("SERVER SIGNAL: Signal type: #{payload.signal["type"]}")
-    IO.puts("SERVER SIGNAL: Call ID: #{socket.assigns.call_id}")
 
     {:noreply, push_event(socket, "voice:receive_signal", payload)}
   end
