@@ -1,18 +1,14 @@
-const ChatMessageTextarea = {
+export default {
   mounted() {
-    this.el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        const form = this.el.closest("form");
-
-        this.el.dispatchEvent(
-          new Event("change", { bubbles: true, cancelable: true })
-        );
-        form.dispatchEvent(
-          new Event("submit", { bubbles: true, cancelable: true })
-        );
+    this.handleEvent("show_chat_messages", () => {
+      const messageList = document.getElementById("room-messages");
+      if (messageList) {
+        messageList.style.display = "flex";
+      }
+      const searchResults = document.querySelector(".search-results-container");
+      if (searchResults) {
+        searchResults.style.display = "none";
       }
     });
-  },
-};
-
-export default ChatMessageTextarea;
+  }
+}

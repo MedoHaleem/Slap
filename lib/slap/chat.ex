@@ -240,6 +240,31 @@ defmodule Slap.Chat do
     )
   end
 
+  def search_messages(room_id, query) when query in [nil, ""] do
+    []
+  end
+
+  def search_messages(room_id, query) do
+    # Use PostgreSQL's full-text search for better performance
+    search_query = "#{query}:*"
+
+    Message
+    |> where([m], m.room_id == ^room_id)
+    |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
+    |> preload_message_user_and_replies()
+    |> preload_reactions()
+    |> preload_attachments()
+    |> Repo.all()
+  end
+
+  def broadcast_search_results(room_id, results) do
+    Phoenix.PubSub.broadcast!(
+      @pubsub,
+      topic(room_id),
+      {:search_results, results}
+    )
+  end
+
   defp preload_reactions(message_query) do
     reactions_query = from r in Reaction, order_by: [asc: :id]
 

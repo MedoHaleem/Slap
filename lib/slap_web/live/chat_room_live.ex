@@ -3,6 +3,7 @@ defmodule SlapWeb.ChatRoomLive do
   alias Phoenix.LiveView.JS
 
   import SlapWeb.SocketHelpers
+  import SlapWeb.UserComponents  # Add this to access user_avatar
 
   alias Slap.Accounts
   alias Slap.Chat
@@ -38,6 +39,7 @@ defmodule SlapWeb.ChatRoomLive do
     |> assign(rooms: rooms, timezone: timezone, users: users)
     |> assign(online_users: OnlineUsers.list())
     |> assign(incoming_call: nil)
+    |> assign(search_query: nil)  # Initialize search_query
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
@@ -69,13 +71,56 @@ defmodule SlapWeb.ChatRoomLive do
         joined?={@joined?}
         current_user={@current_user}
       />
-      <.live_component
-        module={MessageListComponent}
-        id="message-list"
-        streams={@streams}
-        current_user={@current_user}
-        timezone={@timezone}
-      />
+      <div class="p-2 border-b">
+        <form phx-change="search" phx-submit="search">
+          <div class="flex gap-2">
+            <input
+              type="text"
+              name="query"
+              value={@search_query || ""}
+              placeholder="Search messages..."
+              class="flex-1 px-3 py-2 border rounded-md"
+            />
+            <%= if @search_query do %>
+              <button
+                type="button"
+                phx-click="clear_search"
+                class="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            <% end %>
+          </div>
+        </form>
+      </div>
+
+      <%= if @search_query do %>
+        <div class="p-4 bg-gray-100 search-results-container">
+          <h3 class="font-bold mb-2">Search Results</h3>
+          <div class="space-y-2">
+            <%= for message <- @search_results do %>
+              <div class="p-2 bg-white rounded shadow">
+                <div class="flex items-center">
+                  <.user_avatar user={message.user} class="h-6 w-6 rounded mr-2" />
+                  <span class="font-medium"><%= message.user.username %></span>
+                  <span class="text-gray-500 text-sm ml-2">
+                    <%= Calendar.strftime(message.inserted_at, "%b %d, %H:%M") %>
+                  </span>
+                </div>
+                <p class="mt-1"><%= message.body %></p>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% else %>
+        <.live_component
+          module={MessageListComponent}
+          id="message-list"
+          streams={@streams}
+          current_user={@current_user}
+          timezone={@timezone}
+        />
+      <% end %>
       <.live_component
         :if={@joined?}
         module={MessageFormComponent}
@@ -281,6 +326,40 @@ defmodule SlapWeb.ChatRoomLive do
     {:noreply, socket}
   end
 
+  def handle_event("search", %{"query" => query}, socket) do
+    trimmed_query = String.trim(query)
+    if trimmed_query == "" do
+      # Refetch the original room messages when search is cleared
+      page = Chat.list_messages_in_room(socket.assigns.room)
+      socket =
+        socket
+        |> assign(search_results: [], search_query: nil)
+        |> stream(:messages, [], reset: true)
+        |> stream_message_page(page)
+        |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
+
+      {:noreply, socket}
+    else
+      room_id = socket.assigns.room.id
+      results = Chat.search_messages(room_id, trimmed_query)
+      Chat.broadcast_search_results(room_id, results)
+      {:noreply, assign(socket, search_results: results, search_query: trimmed_query)}
+    end
+  end
+
+  def handle_event("clear_search", _, socket) do
+    # Refetch the original room messages when search is cleared
+    page = Chat.list_messages_in_room(socket.assigns.room)
+    socket =
+      socket
+      |> assign(search_results: [], search_query: nil)
+      |> stream(:messages, [], reset: true)
+      |> stream_message_page(page)
+      |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
+
+    {:noreply, socket}
+  end
+
   def handle_event("remove-reaction", %{"message_id" => message, "emoji" => emoji}, socket) do
     message = Chat.get_message!(message)
 
@@ -381,6 +460,16 @@ defmodule SlapWeb.ChatRoomLive do
     socket
     |> refresh_message(message)
     |> noreply()
+  end
+
+  def handle_info({:search_results, messages}, socket) do
+    {:noreply, assign(socket, search_results: messages || [])}
+  end
+
+  def handle_info(msg, socket) do
+    require Logger
+    Logger.warn("Unhandled message in ChatRoomLive: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   def handle_info(%{event: "presence_diff", payload: diff}, socket) do

@@ -27,6 +27,11 @@ const RoomMessages = {
     this.handleEvent("reset_pagination", ({ can_load_more }) => {
       this.canLoadMore = can_load_more;
     });
+
+    this.handleEvent("show_chat_messages", () => {
+      // Trigger a re-render of the message list
+      this.el.dispatchEvent(new Event('phx:update'));
+    });
     this.handleEvent("update_avatar", ({ user_id, avatar_path }) => {
       const avatars = this.el.querySelectorAll(
         `img[data-user-avatar-id="${user_id}"]`
