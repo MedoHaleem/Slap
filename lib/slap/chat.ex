@@ -240,21 +240,42 @@ defmodule Slap.Chat do
     )
   end
 
-  def search_messages(room_id, query) when query in [nil, ""] do
-    []
+  def search_messages(room_id, query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    offset = Keyword.get(opts, :offset, 0)
+
+    if query in [nil, ""] do
+      []
+    else
+      # Use PostgreSQL's full-text search for better performance
+      search_query = "#{query}:*"
+
+      Message
+      |> where([m], m.room_id == ^room_id)
+      |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
+      |> preload_message_user_and_replies()
+      |> preload_reactions()
+      |> preload_attachments()
+      |> limit(^limit)
+      |> offset(^offset)
+      |> order_by([m], desc: :inserted_at)
+      |> Repo.all()
+    end
   end
 
-  def search_messages(room_id, query) do
-    # Use PostgreSQL's full-text search for better performance
-    search_query = "#{query}:*"
+  def count_search_results(room_id, query) do
+    if query in [nil, ""] do
+      0
+    else
+      # Use PostgreSQL's full-text search for better performance
+      search_query = "#{query}:*"
 
-    Message
-    |> where([m], m.room_id == ^room_id)
-    |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
-    |> preload_message_user_and_replies()
-    |> preload_reactions()
-    |> preload_attachments()
-    |> Repo.all()
+      Message
+      |> where([m], m.room_id == ^room_id)
+      |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
+      |> select([m], count(m.id))
+      |> Repo.one()
+    end
   end
 
   def broadcast_search_results(room_id, results) do

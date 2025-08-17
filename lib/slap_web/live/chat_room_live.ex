@@ -96,18 +96,34 @@ defmodule SlapWeb.ChatRoomLive do
 
       <%= if @search_query do %>
         <div class="p-4 bg-gray-100 search-results-container">
-          <h3 class="font-bold mb-2">Search Results</h3>
-          <div class="space-y-2">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-lg">Search Results</h3>
+            <span class="text-sm text-gray-500"><%= length(@search_results) %> results found</span>
+          </div>
+          <div class="space-y-3">
             <%= for message <- @search_results do %>
-              <div class="p-2 bg-white rounded shadow">
-                <div class="flex items-center">
-                  <.user_avatar user={message.user} class="h-6 w-6 rounded mr-2" />
-                  <span class="font-medium"><%= message.user.username %></span>
-                  <span class="text-gray-500 text-sm ml-2">
-                    <%= Calendar.strftime(message.inserted_at, "%b %d, %H:%M") %>
-                  </span>
+              <div class="p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="flex items-center">
+                    <.user_avatar user={message.user} class="h-8 w-8 rounded-full mr-3" />
+                    <div>
+                      <span class="font-medium text-gray-900"><%= message.user.username %></span>
+                      <span class="text-gray-500 text-sm ml-2 block">
+                        <%= Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M") %>
+                      </span>
+                    </div>
+                  </div>
+                  <.link
+                    patch={~p"/rooms/#{@room}"}
+                    phx-click={JS.exec("scroll-to-message", to: "#messages-#{message.id}")}
+                    class="text-blue-500 hover:text-blue-700 text-sm"
+                  >
+                    View in context
+                  </.link>
                 </div>
-                <p class="mt-1"><%= message.body %></p>
+                <div class="text-gray-700 leading-relaxed">
+                  <%= raw(highlight_search_terms(message.body, @search_query)) %>
+                </div>
               </div>
             <% end %>
           </div>
@@ -333,7 +349,7 @@ defmodule SlapWeb.ChatRoomLive do
       page = Chat.list_messages_in_room(socket.assigns.room)
       socket =
         socket
-        |> assign(search_results: [], search_query: nil)
+        |> assign(search_results: [], search_query: nil, search_count: 0)
         |> stream(:messages, [], reset: true)
         |> stream_message_page(page)
         |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
@@ -341,9 +357,10 @@ defmodule SlapWeb.ChatRoomLive do
       {:noreply, socket}
     else
       room_id = socket.assigns.room.id
-      results = Chat.search_messages(room_id, trimmed_query)
+      results = Chat.search_messages(room_id, trimmed_query, limit: 20)
+      total_count = Chat.count_search_results(room_id, trimmed_query)
       Chat.broadcast_search_results(room_id, results)
-      {:noreply, assign(socket, search_results: results, search_query: trimmed_query)}
+      {:noreply, assign(socket, search_results: results, search_query: trimmed_query, search_count: total_count)}
     end
   end
 
@@ -352,7 +369,7 @@ defmodule SlapWeb.ChatRoomLive do
     page = Chat.list_messages_in_room(socket.assigns.room)
     socket =
       socket
-      |> assign(search_results: [], search_query: nil)
+      |> assign(search_results: [], search_query: nil, search_count: 0)
       |> stream(:messages, [], reset: true)
       |> stream_message_page(page)
       |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
@@ -601,5 +618,25 @@ defmodule SlapWeb.ChatRoomLive do
     else
       socket
     end
+  end
+
+  # Helper function to highlight search terms
+  defp highlight_search_terms(text, query) do
+    if query && query != "" do
+      # Escape special regex characters in the query
+      escaped_query = Regex.escape(query)
+
+      # Create regex with word boundaries to match whole words only
+      regex = ~r/#{escaped_query}/i
+
+      # Replace matches with highlighted span
+      String.replace(text, regex, &highlight_match/1)
+    else
+      text
+    end
+  end
+
+  defp highlight_match(match) do
+    "<mark class=\"bg-yellow-200 text-yellow-800 px-1 rounded\">#{match}</mark>"
   end
 end

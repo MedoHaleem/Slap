@@ -55,6 +55,15 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         </div>
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
+            <.link
+              patch={~p"/search/#{@current_room}"}
+              class="flex items-center grow hover:bg-slate-200 px-2 py-1 rounded"
+            >
+              <.icon name="hero-magnifying-glass" class="h-4 w-4" />
+              <span class="ml-2 leading-none font-medium text-sm">Search</span>
+            </.link>
+          </div>
+          <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
             </div>
