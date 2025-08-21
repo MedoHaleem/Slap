@@ -45,11 +45,38 @@ const RoomMessages = {
     this.handleEvent("highlight_message", ({ id }) => {
       const item = document.getElementById(`messages-${id}`);
       if (item) {
+        // Add highlight class for styling
         item.classList.add('highlight');
+        
+        // Scroll the message into view
+        item.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+        
+        // Remove highlight after animation
         setTimeout(() => {
           item.classList.remove('highlight');
           item.classList.add('no-highlight');
         }, 3000);
+      } else {
+        // If message not found, it might be in a different page
+        // Try scrolling to bottom first, then highlight
+        this.el.scrollTop = this.el.scrollHeight;
+        setTimeout(() => {
+          const retryItem = document.getElementById(`messages-${id}`);
+          if (retryItem) {
+            retryItem.classList.add('highlight');
+            retryItem.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+            setTimeout(() => {
+              retryItem.classList.remove('highlight');
+              retryItem.classList.add('no-highlight');
+            }, 3000);
+          }
+        }, 100);
       }
     });
 

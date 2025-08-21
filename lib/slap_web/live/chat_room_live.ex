@@ -95,14 +95,14 @@ defmodule SlapWeb.ChatRoomLive do
           </div>
         </form>
       </div>
-      
+
       <%= if @search_query do %>
         <div class="p-4 bg-gray-100 search-results-container">
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-lg">Search Results</h3>
              <span class="text-sm text-gray-500">{length(@search_results)} results found</span>
           </div>
-          
+
           <div class="space-y-3">
             <%= for message <- @search_results do %>
               <div class="p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
@@ -116,31 +116,26 @@ defmodule SlapWeb.ChatRoomLive do
                           In Thread
                         </span>
                       <% end %>
-                      
+
                       <span class="text-gray-500 text-sm ml-2 block">
                         {Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M")}
                       </span>
                     </div>
                   </div>
-                  
+
                   <.link
                     patch={
                       if Map.get(message, :type) == :reply,
                         do:
                           ~p"/rooms/#{@room}?thread=#{message.parent_message_id}&highlight=#{message.id}",
-                        else: ~p"/rooms/#{@room}"
-                    }
-                    phx-click={
-                      if Map.get(message, :type) == :reply,
-                        do: "",
-                        else: JS.exec("scroll-to-message", to: "#messages-#{message.id}")
+                        else: ~p"/rooms/#{@room}?highlight=#{message.id}"
                     }
                     class="text-blue-500 hover:text-blue-700 text-sm"
                   >
                     View in context
                   </.link>
                 </div>
-                
+
                 <div class="text-gray-700 leading-relaxed">
                   {raw(highlight_search_terms(message.body, @search_query))}
                   <%= if Map.get(message, :type) == :reply do %>
@@ -162,7 +157,7 @@ defmodule SlapWeb.ChatRoomLive do
           timezone={@timezone}
         />
       <% end %>
-      
+
       <.live_component
         :if={@joined?}
         module={MessageFormComponent}
@@ -202,12 +197,12 @@ defmodule SlapWeb.ChatRoomLive do
             <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
               <.icon name="hero-phone" class="h-8 w-8 text-purple-600" />
             </div>
-            
+
             <h3 class="text-lg font-bold">Incoming Call</h3>
-            
+
             <p class="text-gray-600">{@incoming_call.username} is calling you</p>
           </div>
-          
+
           <div class="flex space-x-3 justify-center">
             <button
               id="accept-call-button"
@@ -219,7 +214,7 @@ defmodule SlapWeb.ChatRoomLive do
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
             </button>
-            
+
             <button
               phx-click="reject_call"
               class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full flex items-center"
@@ -237,7 +232,7 @@ defmodule SlapWeb.ChatRoomLive do
       on_cancel={JS.navigate(~p"/rooms/#{@room}")}
     >
       <.header>New chat room</.header>
-      
+
       <.live_component
         module={SlapWeb.ChatRoomLive.FormComponent}
         id="new-room-form-component"
@@ -268,6 +263,13 @@ defmodule SlapWeb.ChatRoomLive do
     thread_message_id = Map.get(params, "thread")
     highlight_message_id = Map.get(params, "highlight")
 
+    # Clear search results when navigating to highlight a message
+    socket = if highlight_message_id || thread_message_id do
+      assign(socket, search_results: [], search_query: nil, search_count: 0)
+    else
+      socket
+    end
+
     socket
     |> assign(
       hide_topic?: false,
@@ -275,7 +277,8 @@ defmodule SlapWeb.ChatRoomLive do
       room: room,
       last_read_id: last_read_id,
       page_title: "#" <> room.name,
-      thread_highlight_id: highlight_message_id
+      thread_highlight_id: highlight_message_id,
+      highlight_message_id: highlight_message_id
     )
     |> stream(:messages, [], reset: true)
     |> stream_message_page(page)
@@ -291,6 +294,7 @@ defmodule SlapWeb.ChatRoomLive do
       end)
     end)
     |> maybe_open_thread(thread_message_id)
+    |> maybe_highlight_message(highlight_message_id)
     |> noreply()
   end
 
@@ -306,6 +310,24 @@ defmodule SlapWeb.ChatRoomLive do
         |> push_event("highlight_thread_message", %{
           message_id: socket.assigns.thread_highlight_id
         })
+
+      :error ->
+        socket
+    end
+  end
+
+  defp maybe_highlight_message(socket, nil), do: socket
+
+  defp maybe_highlight_message(socket, highlight_message_id) do
+    case Integer.parse(highlight_message_id) do
+      {message_id, _} ->
+        # Only highlight if not opening a thread (thread handles its own highlighting)
+        if !socket.assigns[:thread] do
+          socket
+          |> push_event("highlight_message", %{id: message_id})
+        else
+          socket
+        end
 
       :error ->
         socket
