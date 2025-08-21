@@ -23,6 +23,7 @@ defmodule SlapWeb.ChatRoomLive.ProfileComponent do
             Profile
           </h2>
         </div>
+        
         <button
           class="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-300 ml-auto"
           phx-click="close-profile"
@@ -30,6 +31,7 @@ defmodule SlapWeb.ChatRoomLive.ProfileComponent do
           <.icon name="hero-x-mark" class="w-5 h-5" />
         </button>
       </div>
+      
       <div class="flex flex-col grow overflow-auto p-4">
         <div class="mb-4">
           <%= if @current_user.id == @user.id do %>
@@ -59,17 +61,18 @@ defmodule SlapWeb.ChatRoomLive.ProfileComponent do
                   <.user_avatar user={@user} />
                 <% end %>
               </div>
+              
               <label class="block mb-2 font-semibold text-lg text-gray-800">
                 Upload avatar
               </label>
-              <.live_file_input upload={@uploads.avatar} class="w-full" />
+               <.live_file_input upload={@uploads.avatar} class="w-full" />
             </.form>
-
-            <hr class="mt-4" />
+             <hr class="mt-4" />
           <% else %>
             <.user_avatar user={@user} class="w-48 rounded mx-auto" />
           <% end %>
         </div>
+        
         <h2 class="text-xl font-bold text-gray-800">
           {@user.username}
         </h2>

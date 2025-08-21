@@ -17,6 +17,7 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponent do
           <% :unread_marker -> %>
             <div id={dom_id} class="w-full flex text-red-500 items-center gap-3 pr-5">
               <div class="w-full h-px grow bg-red-500"></div>
+              
               <div class="text-sm">New</div>
             </div>
           <% %Message{} -> %>

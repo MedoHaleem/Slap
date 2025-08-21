@@ -7,8 +7,10 @@ defmodule SlapWeb.ChatRoomLive.JoinRoomComponent do
       <div class="max-w-3-xl text-center">
         <div class="mb-4">
           <h1 class="text-xl font-semibold">#{@room.name}</h1>
+          
           <p :if={@room.topic} class="text-sm mt-1 text-gray-600">{@room.topic}</p>
         </div>
+        
         <div class="flex items-center justify-around">
           <button
             phx-click="join-room"
@@ -17,6 +19,7 @@ defmodule SlapWeb.ChatRoomLive.JoinRoomComponent do
             Join Room
           </button>
         </div>
+        
         <div class="mt-4">
           <.link
             navigate={~p"/rooms"}

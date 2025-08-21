@@ -7,6 +7,7 @@ defmodule SlapWeb.ChatRoomLive.Index do
     <main class="flex-1 p-6 max-w-4xl mx-auto">
       <div class="flex justify-between mb-4 items-center">
         <h1 class="text-xl font-semibold">{@page_title}</h1>
+        
         <button
           phx-click={show_modal("new-room-modal")}
           class="bg-white font-semibold py-2 px-4 border border-slate-400 rounded shadow-sm"
@@ -14,6 +15,7 @@ defmodule SlapWeb.ChatRoomLive.Index do
           Create room
         </button>
       </div>
+      
       <div class="bg-slate-50 border rounded">
         <div id="rooms" class="divide-y" phx-update="stream">
           <div
@@ -32,19 +34,22 @@ defmodule SlapWeb.ChatRoomLive.Index do
                   View room
                 </span>
               </div>
+              
               <div class="text-gray-500 text-sm">
                 <%= if joined? do %>
                   <span class="text-green-600 font-bold">✓ Joined</span>
                 <% end %>
+                
                 <%= if joined? && room.topic do %>
                   <span class="mx-1">·</span>
                 <% end %>
+                
                 <%= if room.topic do %>
                   {room.topic}
                 <% end %>
               </div>
             </div>
-
+            
             <button
               class="opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus:opacity-100 bg-white hover:bg-gray-100 border border-gray-400 text-gray-700 px-3 py-1.5 w-24 rounded-sm font-bold"
               phx-click="toggle-room-membership"
@@ -59,45 +64,47 @@ defmodule SlapWeb.ChatRoomLive.Index do
           </div>
         </div>
       </div>
+      
       <div :if={@num_pages > 1} class="py-4">
         <nav class="flex justify-around">
           <ul class="flex items-center -space-x-px h-10 text-base">
             <li>
-<%= if @page == 1 do %>
-<span class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg opacity-50 cursor-not-allowed">
-  <span class="sr-only">Previous</span> &lsaquo;
-</span>
-<% else %>
-<.link
-  patch={~p"/rooms?page=#{@page - 1}"}
-  class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700"
->
-  <span class="sr-only">Previous</span> &lsaquo;
-</.link>
-<% end %>
+              <%= if @page == 1 do %>
+                <span class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg opacity-50 cursor-not-allowed">
+                  <span class="sr-only">Previous</span> &lsaquo;
+                </span>
+              <% else %>
+                <.link
+                  patch={~p"/rooms?page=#{@page - 1}"}
+                  class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700"
+                >
+                  <span class="sr-only">Previous</span> &lsaquo;
+                </.link>
+              <% end %>
             </li>
-            <.page_number :for={i <- 1..@num_pages} number={i} current?={i == @page} />
+             <.page_number :for={i <- 1..@num_pages} number={i} current?={i == @page} />
             <li>
-<%= if @page + 1 > @num_pages do %>
-<span class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg opacity-50 cursor-not-allowed">
-  <span class="sr-only">Next</span> &rsaquo;
-</span>
-<% else %>
-<.link
-  patch={~p"/rooms?page=#{@page + 1}"}
-  class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700"
->
-  <span class="sr-only">Next</span> &rsaquo;
-</.link>
-<% end %>
+              <%= if @page + 1 > @num_pages do %>
+                <span class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg opacity-50 cursor-not-allowed">
+                  <span class="sr-only">Next</span> &rsaquo;
+                </span>
+              <% else %>
+                <.link
+                  patch={~p"/rooms?page=#{@page + 1}"}
+                  class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700"
+                >
+                  <span class="sr-only">Next</span> &rsaquo;
+                </.link>
+              <% end %>
             </li>
           </ul>
         </nav>
       </div>
     </main>
+
     <.modal id="new-room-modal">
       <.header>New chat room</.header>
-
+      
       <.live_component
         module={SlapWeb.ChatRoomLive.FormComponent}
         current_user={@current_user}

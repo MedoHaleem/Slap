@@ -15,12 +15,12 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
           </h1>
         </div>
       </div>
-
+      
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3">
           <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
         </div>
-
+        
         <div id="rooms-list">
           <.room_link
             :for={{room, unread_count} <- @rooms}
@@ -40,6 +40,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
                   >
                     Browse rooms
                   </div>
+                  
                   <div
                     phx-click={
                       JS.navigate(~p"/rooms/#{@current_room}/new") |> show_modal("new-room-modal")
@@ -53,6 +54,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             </div>
           </button>
         </div>
+        
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
             <.link
@@ -63,11 +65,13 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
               <span class="ml-2 leading-none font-medium text-sm">Search</span>
             </.link>
           </div>
+          
           <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
             </div>
           </div>
+          
           <div id="users-list">
             <.user
               :for={user <- @users}
@@ -130,8 +134,9 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             <span class="w-2 h-2 rounded-full border-2 border-gray-500"></span>
           <% end %>
         </div>
-        <span class="ml-2 leading-none">{@user.username}</span>
+         <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
+      
       <%= if @online && @user.id != @current_user.id do %>
         <a
           href={~p"/voice-chat/#{@user.id}"}
@@ -160,11 +165,10 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
       patch={~p"/rooms/#{@room}"}
     >
       <.icon name="hero-hashtag" class="h-4 w-4" />
-
       <span class={["ml-2 leading-none", @active && "font-bold"]}>
         {@room.name}
       </span>
-      <.unread_message_counter count={@unread_count} />
+       <.unread_message_counter count={@unread_count} />
     </.link>
     """
   end

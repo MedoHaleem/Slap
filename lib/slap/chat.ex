@@ -243,6 +243,7 @@ defmodule Slap.Chat do
   def search_messages(room_id, query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     offset = Keyword.get(opts, :offset, 0)
+    include_threads = Keyword.get(opts, :include_threads, true)
 
     if query in [nil, ""] do
       []
@@ -250,16 +251,76 @@ defmodule Slap.Chat do
       # Use PostgreSQL's full-text search for better performance
       search_query = "#{query}:*"
 
-      Message
-      |> where([m], m.room_id == ^room_id)
-      |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
-      |> preload_message_user_and_replies()
-      |> preload_reactions()
-      |> preload_attachments()
-      |> limit(^limit)
-      |> offset(^offset)
-      |> order_by([m], desc: :inserted_at)
-      |> Repo.all()
+      main_messages_query =
+        Message
+        |> where([m], m.room_id == ^room_id)
+        |> where(
+          [m],
+          fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query)
+        )
+        |> preload_message_user_and_replies()
+        |> preload_reactions()
+        |> preload_attachments()
+        |> limit(^limit)
+        |> offset(^offset)
+        |> order_by([m], desc: :inserted_at)
+
+      if include_threads do
+        # Also search in thread replies
+        replies_query =
+          Reply
+          |> join(:inner, [r], m in Message, on: r.message_id == m.id)
+          |> where([r, m], m.room_id == ^room_id)
+          |> where(
+            [r],
+            fragment(
+              "to_tsvector('english', ?) @@ to_tsquery('english', ?)",
+              r.body,
+              ^search_query
+            )
+          )
+          |> preload([:user, :message])
+          |> order_by([r], desc: :inserted_at)
+          |> limit(^limit)
+          |> offset(^offset)
+
+        # Combine main messages and replies, then sort by insertion time
+        main_messages = Repo.all(main_messages_query)
+        replies = Repo.all(replies_query)
+
+        # Combine and sort results
+        combined = Enum.map(main_messages, &{:message, &1}) ++ Enum.map(replies, &{:reply, &1})
+
+        sorted_combined =
+          Enum.sort_by(
+            combined,
+            fn
+              {:message, m} -> m.inserted_at
+              {:reply, r} -> r.inserted_at
+            end,
+            &(DateTime.compare(&1, &2) != :lt)
+          )
+
+        # Extract just the messages/replies in the correct order
+        Enum.map(sorted_combined, fn
+          {:message, m} ->
+            m
+
+          {:reply, r} ->
+            # Convert reply to a message-like structure for consistency
+            %{
+              id: r.id,
+              body: r.body,
+              user: r.user,
+              inserted_at: r.inserted_at,
+              type: :reply,
+              parent_message_id: r.message_id,
+              parent_message: get_message!(r.message_id)
+            }
+        end)
+      else
+        Repo.all(main_messages_query)
+      end
     end
   end
 
@@ -270,11 +331,30 @@ defmodule Slap.Chat do
       # Use PostgreSQL's full-text search for better performance
       search_query = "#{query}:*"
 
-      Message
-      |> where([m], m.room_id == ^room_id)
-      |> where([m], fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query))
-      |> select([m], count(m.id))
-      |> Repo.one()
+      # Count main messages
+      main_message_count =
+        Message
+        |> where([m], m.room_id == ^room_id)
+        |> where(
+          [m],
+          fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query)
+        )
+        |> select([m], count(m.id))
+        |> Repo.one() || 0
+
+      # Count thread replies
+      reply_count =
+        Reply
+        |> join(:inner, [r], m in Message, on: r.message_id == m.id)
+        |> where([r, m], m.room_id == ^room_id)
+        |> where(
+          [r],
+          fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", r.body, ^search_query)
+        )
+        |> select([r], count(r.id))
+        |> Repo.one() || 0
+
+      main_message_count + reply_count
     end
   end
 

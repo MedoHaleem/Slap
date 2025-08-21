@@ -4,7 +4,6 @@ defmodule Slap.Chat.Room do
   alias Slap.Accounts.User
   alias Slap.Chat.RoomMembership
 
-
   schema "rooms" do
     field :name, :string
     field :topic, :string

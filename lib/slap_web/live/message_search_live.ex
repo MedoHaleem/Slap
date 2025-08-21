@@ -10,6 +10,7 @@ defmodule SlapWeb.MessageSearchLive do
 
   def handle_params(%{"room_id" => room_id}, _uri, socket) do
     room = Chat.get_room!(room_id)
+
     socket
     |> assign(room: room)
     |> noreply()
@@ -18,8 +19,8 @@ defmodule SlapWeb.MessageSearchLive do
   def render(assigns) do
     ~H"""
     <div class="p-4">
-      <h1 class="text-xl font-bold mb-4">Search Messages in <%= @room.name %></h1>
-
+      <h1 class="text-xl font-bold mb-4">Search Messages in {@room.name}</h1>
+      
       <form phx-change="search" phx-submit="search" class="mb-6">
         <div class="flex gap-2">
           <input
@@ -30,21 +31,25 @@ defmodule SlapWeb.MessageSearchLive do
             class="flex-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             autocomplete="off"
           />
-          <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors">
+          <button
+            type="submit"
+            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+          >
             Search
           </button>
         </div>
       </form>
-
+      
       <%= if @search_query do %>
         <div class="mb-4">
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-lg font-semibold">
               Search Results
               <%= if @search_count > 0 do %>
-                <span class="text-sm font-normal text-gray-500">(<%= @search_count %> results)</span>
+                <span class="text-sm font-normal text-gray-500">({@search_count} results)</span>
               <% end %>
             </h2>
+            
             <%= if @search_count > @per_page do %>
               <div class="flex gap-2">
                 <%= if @page > 1 do %>
@@ -55,9 +60,11 @@ defmodule SlapWeb.MessageSearchLive do
                     Previous
                   </button>
                 <% end %>
+                
                 <span class="px-3 py-1 text-sm text-gray-600">
-                  Page <%= @page %>
+                  Page {@page}
                 </span>
+                
                 <%= if length(@search_results) == @per_page do %>
                   <button
                     phx-click="next_page"
@@ -69,10 +76,10 @@ defmodule SlapWeb.MessageSearchLive do
               </div>
             <% end %>
           </div>
-
+          
           <%= if @search_count == 0 do %>
             <div class="text-center py-8 text-gray-500">
-              <p>No messages found matching "<%= @search_query %>"</p>
+              <p>No messages found matching "{@search_query}"</p>
             </div>
           <% else %>
             <div class="space-y-3">
@@ -80,20 +87,38 @@ defmodule SlapWeb.MessageSearchLive do
                 <div class="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex items-center">
-                      <span class="font-medium text-gray-900"><%= message.user.username %></span>
+                      <span class="font-medium text-gray-900">{message.user.username}</span>
+                      <%= if message.type == :reply do %>
+                        <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                          In Thread
+                        </span>
+                      <% end %>
+                      
                       <span class="text-gray-500 text-sm ml-3">
-                        <%= Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M") %>
+                        {Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M")}
                       </span>
                     </div>
+                    
                     <.link
-                      patch={~p"/rooms/#{@room}"}
+                      patch={
+                        if message.type == :reply,
+                          do:
+                            ~p"/rooms/#{@room}?thread=#{message.parent_message_id}&highlight=#{message.id}",
+                          else: ~p"/rooms/#{@room}"
+                      }
                       class="text-blue-500 hover:text-blue-700 text-sm"
                     >
                       View in context
                     </.link>
                   </div>
+                  
                   <div class="text-gray-700 leading-relaxed">
-                    <%= raw(highlight_search_terms(message.body, @search_query)) %>
+                    {raw(highlight_search_terms(message.body, @search_query))}
+                    <%= if message.type == :reply do %>
+                      <div class="mt-2 text-sm text-gray-500">
+                        <em>Reply to: {String.slice(message.parent_message.body, 0..50)}...</em>
+                      </div>
+                    <% end %>
                   </div>
                 </div>
               <% end %>
@@ -102,7 +127,7 @@ defmodule SlapWeb.MessageSearchLive do
         </div>
       <% else %>
         <div class="text-center py-12 text-gray-500">
-          <p>Enter a search query to find messages in <%= @room.name %></p>
+          <p>Enter a search query to find messages in {@room.name}</p>
         </div>
       <% end %>
     </div>
@@ -111,17 +136,25 @@ defmodule SlapWeb.MessageSearchLive do
 
   def handle_event("search", %{"query" => query}, socket) do
     trimmed_query = String.trim(query)
+
     if trimmed_query == "" do
       {:noreply, assign(socket, search_results: [], search_query: nil, search_count: 0, page: 1)}
     else
-      results = Chat.search_messages(socket.assigns.room.id, trimmed_query, limit: socket.assigns.per_page)
+      results =
+        Chat.search_messages(socket.assigns.room.id, trimmed_query,
+          limit: socket.assigns.per_page,
+          include_threads: true
+        )
+
       total_count = Chat.count_search_results(socket.assigns.room.id, trimmed_query)
-      {:noreply, assign(socket,
-        search_results: results,
-        search_query: trimmed_query,
-        search_count: total_count,
-        page: 1
-      )}
+
+      {:noreply,
+       assign(socket,
+         search_results: results,
+         search_query: trimmed_query,
+         search_count: total_count,
+         page: 1
+       )}
     end
   end
 
@@ -130,12 +163,14 @@ defmodule SlapWeb.MessageSearchLive do
     offset = (page - 1) * socket.assigns.per_page
     query = socket.assigns.search_query
 
-    results = Chat.search_messages(
-      socket.assigns.room.id,
-      query,
-      limit: socket.assigns.per_page,
-      offset: offset
-    )
+    results =
+      Chat.search_messages(
+        socket.assigns.room.id,
+        query,
+        limit: socket.assigns.per_page,
+        offset: offset,
+        include_threads: true
+      )
 
     {:noreply, assign(socket, search_results: results, page: page)}
   end
@@ -145,12 +180,14 @@ defmodule SlapWeb.MessageSearchLive do
     offset = (page - 1) * socket.assigns.per_page
     query = socket.assigns.search_query
 
-    results = Chat.search_messages(
-      socket.assigns.room.id,
-      query,
-      limit: socket.assigns.per_page,
-      offset: offset
-    )
+    results =
+      Chat.search_messages(
+        socket.assigns.room.id,
+        query,
+        limit: socket.assigns.per_page,
+        offset: offset,
+        include_threads: true
+      )
 
     {:noreply, assign(socket, search_results: results, page: page)}
   end

@@ -18,6 +18,25 @@ const Thread = {
         avatar.src = `/uploads/${avatar_path}`;
       });
     });
+
+    this.handleEvent("highlight_thread_message", ({ message_id }) => {
+      const messageElement = this.el.querySelector(`[data-message-id="${message_id}"]`);
+      if (messageElement) {
+        // Add the highlight class
+        messageElement.classList.add('thread-highlight', 'message-highlight-animation');
+        
+        // Remove animation class after animation completes
+        setTimeout(() => {
+          messageElement.classList.remove('message-highlight-animation');
+        }, 3000);
+        
+        // Scroll to the highlighted message
+        messageElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    });
   },
 };
 

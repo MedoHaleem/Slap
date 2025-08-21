@@ -30,7 +30,6 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             phx-hook="ChatMessageTextArea"
             rows="1"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
-
           <div class="flex items-center">
             <button
               type="button"
@@ -41,7 +40,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             >
               <.icon name="hero-paper-clip" class="h-4 w-4" />
             </button>
-
+            
             <button
               type="submit"
               class="shrink flex items-center justify-center h-6 w-6 rounded hover:bg-slate-200"
@@ -50,7 +49,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             </button>
           </div>
         </div>
-
+        
         <div :if={@show_file_selector} class="mt-2 p-2 border border-slate-200 rounded bg-slate-50">
           <div class="flex flex-col">
             <label class="text-sm text-slate-700 mb-1">Attach PDF file</label>
@@ -60,7 +59,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
                 {error_to_string(error)}
               </span>
             </div>
-
+            
             <div
               :for={entry <- @uploads.pdf_file.entries}
               class="mt-2 flex items-center justify-between"
@@ -70,6 +69,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
                 <span class="text-xs truncate max-w-[150px]">{entry.client_name}</span>
                 <span class="text-xs text-slate-500">{format_bytes(entry.client_size)}</span>
               </div>
+              
               <button
                 type="button"
                 phx-click="cancel-upload"

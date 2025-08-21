@@ -1,6 +1,6 @@
 defmodule SlapWeb.VoiceChatLive do
   use SlapWeb, :live_view
-    require Logger
+  require Logger
 
   def mount(%{"target_user_id" => target_user_id_param} = params, _session, socket) do
     current_user_id = socket.assigns.current_user.id
@@ -54,7 +54,6 @@ defmodule SlapWeb.VoiceChatLive do
     end
   end
 
-
   defp get_target_user(user_id) do
     # Accept both string and integer IDs
     id =
@@ -65,7 +64,6 @@ defmodule SlapWeb.VoiceChatLive do
 
     Slap.Accounts.get_user!(id)
   end
-
 
   def handle_event("request_call", _, socket) do
     target_user_id = socket.assigns.target_user_id
@@ -82,7 +80,6 @@ defmodule SlapWeb.VoiceChatLive do
   end
 
   def handle_event("accept_call", _, socket) do
-
     # Notify caller that call was accepted
     SlapWeb.Endpoint.broadcast(topic_call(socket.assigns.call_id), "call_accepted", %{
       by_user_id: socket.assigns.current_user.id
@@ -96,7 +93,6 @@ defmodule SlapWeb.VoiceChatLive do
   end
 
   def handle_event("reject_call", _, socket) do
-
     # Notify caller that call was rejected
     SlapWeb.Endpoint.broadcast(topic_call(socket.assigns.call_id), "call_rejected", %{
       by_user_id: socket.assigns.current_user.id
@@ -107,7 +103,6 @@ defmodule SlapWeb.VoiceChatLive do
   end
 
   def handle_event("signal", %{"signal" => signal_data}, socket) do
-
     call_topic = topic_call(socket.assigns.call_id)
 
     SlapWeb.Endpoint.broadcast(call_topic, "voice_signal", %{
@@ -125,6 +120,7 @@ defmodule SlapWeb.VoiceChatLive do
   def handle_event("end_call", _, socket) do
     # Notify other participant the call ended
     call_topic = topic_call(socket.assigns.call_id)
+
     SlapWeb.Endpoint.broadcast(call_topic, "call_ended", %{
       by_user_id: socket.assigns.current_user.id
     })
@@ -135,7 +131,6 @@ defmodule SlapWeb.VoiceChatLive do
 
   # Handle incoming signal from the other peer
   def handle_info(%{event: "voice_signal", payload: payload}, socket) do
-
     {:noreply, push_event(socket, "voice:receive_signal", payload)}
   end
 
@@ -143,7 +138,7 @@ defmodule SlapWeb.VoiceChatLive do
   def handle_info(
         %{
           event: "voice_call_request",
-          payload: %{from_user_id: user_id, from_username: username, call_id: call_id}
+          payload: %{from_user_id: user_id, from_username: username, call_id: _call_id}
         },
         socket
       ) do
@@ -203,6 +198,7 @@ defmodule SlapWeb.VoiceChatLive do
         <div class="max-w-md mx-auto px-4 flex justify-between items-center">
           <div class="flex items-center">
             <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
+            
             <div class="ml-3 text-sm text-gray-600">
               <%= if @call_status == "incoming" do %>
                 from {@caller.username}
@@ -211,7 +207,7 @@ defmodule SlapWeb.VoiceChatLive do
               <% end %>
             </div>
           </div>
-
+          
           <div class="flex items-center gap-4">
             <%= if @call_status in ["connected", "connecting"] do %>
               <button
@@ -221,6 +217,7 @@ defmodule SlapWeb.VoiceChatLive do
                 <.icon name="hero-phone-x-mark" class="h-5 w-5 mr-2" /> End Call
               </button>
             <% end %>
+            
             <button
               onclick="window.close()"
               class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
@@ -230,30 +227,26 @@ defmodule SlapWeb.VoiceChatLive do
           </div>
         </div>
       </div>
-
+      
       <div class="w-full flex items-center justify-center min-h-screen pt-20">
         <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-auto">
           <div class="text-center">
             <div class={"call-status-badge mb-6 #{status_color(@call_status)}"}>
               {status_message(@call_status)}
             </div>
-
+            
             <div class="mb-8">
               <div class={"w-32 h-32 rounded-full flex items-center justify-center mx-auto #{status_bg_color(@call_status)}"}>
                 <.icon name="hero-microphone" class="h-16 w-16 text-gray-500" />
               </div>
-
+              
               <%= if @call_status == "connected" do %>
                 <div class="audio-wave mt-4">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
+                  <span></span> <span></span> <span></span> <span></span> <span></span>
                 </div>
               <% end %>
             </div>
-
+            
             <div
               id="voice-chat-container"
               phx-hook="VoiceChat"
@@ -280,6 +273,7 @@ defmodule SlapWeb.VoiceChatLive do
                       >
                         <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
                       </button>
+                      
                       <button
                         phx-click="reject_call"
                         class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full text-lg flex items-center"
@@ -307,6 +301,7 @@ defmodule SlapWeb.VoiceChatLive do
                     <div class="mb-4 text-red-600 text-sm">
                       {String.replace_prefix(@call_status, "error: ", "")}
                     </div>
+                    
                     <button
                       phx-click="request_call"
                       class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"
@@ -327,10 +322,6 @@ defmodule SlapWeb.VoiceChatLive do
 
   # Status color helpers
   defp status_color("init"), do: "bg-blue-100 text-blue-800"
-
-  # Helper topic generators
-  defp topic_user(user_id), do: "voice:#{user_id}"
-  defp topic_call(call_id), do: "voice_call:#{call_id}"
   defp status_color("requesting"), do: "bg-yellow-100 text-yellow-800"
   defp status_color("incoming"), do: "bg-purple-100 text-purple-800"
   defp status_color("connecting"), do: "bg-yellow-100 text-yellow-800"
@@ -347,6 +338,10 @@ defmodule SlapWeb.VoiceChatLive do
     end
   end
 
+  # Helper topic generators
+  defp topic_user(user_id), do: "voice:#{user_id}"
+  defp topic_call(call_id), do: "voice_call:#{call_id}"
+
   # Background animation colors for call status
   defp status_bg_color("init"), do: "bg-gray-200"
   defp status_bg_color("requesting"), do: "bg-yellow-200 animate-pulse"
@@ -357,15 +352,17 @@ defmodule SlapWeb.VoiceChatLive do
   defp status_bg_color("rejected"), do: "bg-red-200"
   defp status_bg_color("disconnected"), do: "bg-gray-200"
   defp status_bg_color(_), do: "bg-gray-200"
-def terminate(_reason, socket) do
-  # Unsubscribe from user and call topics
-  if socket.assigns.current_user do
-    SlapWeb.Endpoint.unsubscribe("voice:#{socket.assigns.current_user.id}")
-  end
-  if socket.assigns.call_id do
-    SlapWeb.Endpoint.unsubscribe("voice_call:#{socket.assigns.call_id}")
-  end
-  :ok
-end
 
+  def terminate(_reason, socket) do
+    # Unsubscribe from user and call topics
+    if socket.assigns.current_user do
+      SlapWeb.Endpoint.unsubscribe("voice:#{socket.assigns.current_user.id}")
+    end
+
+    if socket.assigns.call_id do
+      SlapWeb.Endpoint.unsubscribe("voice_call:#{socket.assigns.call_id}")
+    end
+
+    :ok
+  end
 end

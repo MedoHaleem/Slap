@@ -101,3 +101,34 @@
     height: 20px;
   }
 }
+
+/* Thread highlighting styles */
+.thread-highlight {
+  background-color: #FEF3C7 !important;
+  border-left: 4px solid #F59E0B !important;
+  transition: background-color 0.3s ease, border-left-color 0.3s ease;
+}
+
+.thread-highlight:hover {
+  background-color: #FDE68A !important;
+}
+
+/* Message highlight animation */
+@keyframes message-highlight {
+  0% {
+    background-color: #FEF3C7;
+    transform: scale(1);
+  }
+  50% {
+    background-color: #FDE68A;
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: #FEF3C7;
+    transform: scale(1);
+  }
+}
+
+.message-highlight-animation {
+  animation: message-highlight 1s ease-in-out 3;
+}

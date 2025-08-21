@@ -8,7 +8,13 @@ defmodule SlapWeb.RoomComponents do
 
   def room_form(assigns) do
     ~H"""
-    <.simple_form for={@form} id="room-form" phx-change="validate-room" phx-submit="save-room" phx-target={@target}>
+    <.simple_form
+      for={@form}
+      id="room-form"
+      phx-change="validate-room"
+      phx-submit="save-room"
+      phx-target={@target}
+    >
       <.input field={@form[:name]} type="text" label="Name" phx-debounce />
       <.input field={@form[:topic]} type="text" label="Topic" phx-debounce />
       <:actions>

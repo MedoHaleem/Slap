@@ -9,7 +9,6 @@ defmodule SlapWeb.ChatRoomLive.Edit do
     <div class="mx-auto w-96 mt-12">
       <.header>
         {@page_title}
-
         <:actions>
           <.link
             class="font-normal text-xs text-blue-600 hover:text-blue-700"
@@ -19,26 +18,28 @@ defmodule SlapWeb.ChatRoomLive.Edit do
           </.link>
         </:actions>
       </.header>
-
-      <.room_form form={@form} />
+       <.room_form form={@form} />
     </div>
     """
   end
 
   def mount(%{"id" => id}, _session, socket) do
     room = Chat.get_room!(id)
-    socket = if Chat.joined?(room, socket.assigns.current_user) do
-      changeset = Chat.change_room(room)
-      socket
-      |> assign(page_title: "Edit chat room", room: room)
-      |> assign_form(changeset)
-    else
-      socket
-      |> put_flash(:error, "Permission denied")
-      |> push_navigate(to: ~p"/")
-    end
 
-    IO.inspect socket.assigns.form
+    socket =
+      if Chat.joined?(room, socket.assigns.current_user) do
+        changeset = Chat.change_room(room)
+
+        socket
+        |> assign(page_title: "Edit chat room", room: room)
+        |> assign_form(changeset)
+      else
+        socket
+        |> put_flash(:error, "Permission denied")
+        |> push_navigate(to: ~p"/")
+      end
+
+    IO.inspect(socket.assigns.form)
     {:ok, socket}
   end
 
