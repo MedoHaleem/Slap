@@ -362,7 +362,7 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_event("close-thread", _, socket) do
-    {:noreply, assign(socket, :thread, nil)}
+    assign(socket, :thread, nil) |> noreply()
   end
 
   def handle_event("show-thread", %{"id" => message_id}, socket) do
@@ -387,24 +387,24 @@ defmodule SlapWeb.ChatRoomLive do
         socket
       end
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("validate-message", %{"message" => message_params}, socket) do
     changeset = Chat.change_message(%Message{}, message_params)
 
-    {:noreply, assign_message_form(socket, changeset)}
+    assign_message_form(socket, changeset) |> noreply()
   end
 
   def handle_event("delete-message", %{"id" => id, "type" => "Message"}, socket) do
     Chat.delete_message_by_id(id, socket.assigns.current_user)
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("delete-message", %{"id" => id, "type" => "Reply"}, socket) do
     Chat.delete_reply_by_id(id, socket.assigns.current_user)
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("add-reaction", %{"emoji" => emoji, "message_id" => message_id}, socket) do
@@ -412,7 +412,7 @@ defmodule SlapWeb.ChatRoomLive do
 
     Chat.add_reaction(emoji, message, socket.assigns.current_user)
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("search", %{"query" => query}, socket) do
@@ -429,19 +429,19 @@ defmodule SlapWeb.ChatRoomLive do
         |> stream_message_page(page)
         |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
 
-      {:noreply, socket}
+      socket |> noreply()
     else
       room_id = socket.assigns.room.id
       results = Chat.search_messages(room_id, trimmed_query, limit: 20, include_threads: true)
       total_count = Chat.count_search_results(room_id, trimmed_query)
       Chat.broadcast_search_results(room_id, results)
 
-      {:noreply,
-       assign(socket,
-         search_results: results,
-         search_query: trimmed_query,
-         search_count: total_count
-       )}
+      assign(socket,
+        search_results: results,
+        search_query: trimmed_query,
+        search_count: total_count
+      )
+      |> noreply()
     end
   end
 
@@ -456,7 +456,7 @@ defmodule SlapWeb.ChatRoomLive do
       |> stream_message_page(page)
       |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("remove-reaction", %{"message_id" => message, "emoji" => emoji}, socket) do
@@ -464,20 +464,20 @@ defmodule SlapWeb.ChatRoomLive do
 
     Chat.remove_reaction(emoji, message, socket.assigns.current_user)
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("toggle-topic", _, socket) do
-    {:noreply, update(socket, :show_topic, fn show -> !show end)}
+    update(socket, :show_topic, fn show -> !show end) |> noreply()
   end
 
   def handle_event("show-profile", %{"user-id" => user_id}, socket) do
     user = Accounts.get_user!(user_id)
-    {:noreply, assign(socket, profile: user, thread: nil)}
+    assign(socket, profile: user, thread: nil) |> noreply()
   end
 
   def handle_event("close-profile", _, socket) do
-    {:noreply, assign(socket, :profile, nil)}
+    assign(socket, :profile, nil) |> noreply()
   end
 
   def handle_event("join-room", _, socket) do
@@ -491,7 +491,7 @@ defmodule SlapWeb.ChatRoomLive do
         rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
       )
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_event("accept_call", _, socket) do
@@ -502,13 +502,13 @@ defmodule SlapWeb.ChatRoomLive do
     _voice_chat_url = "/voice-chat/#{call.user_id}?accepted_call=true"
 
     # Redirect to the voice chat page, indicating the call was just accepted.
-    {:noreply,
-     socket
-     |> assign(incoming_call: nil)
-     |> push_event("phx:open_voice_call_window", %{
-       url: "/voice-chat/#{call.user_id}",
-       call_id: call.call_id
-     })}
+    socket
+    |> assign(incoming_call: nil)
+    |> push_event("phx:open_voice_call_window", %{
+      url: "/voice-chat/#{call.user_id}",
+      call_id: call.call_id
+    })
+    |> noreply()
   end
 
   def handle_event("reject_call", _, socket) do
@@ -520,7 +520,7 @@ defmodule SlapWeb.ChatRoomLive do
       by_user_id: socket.assigns.current_user.id
     })
 
-    {:noreply, assign(socket, incoming_call: nil)}
+    assign(socket, incoming_call: nil) |> noreply()
   end
 
   def handle_info({:new_message, message}, socket) do
@@ -548,11 +548,11 @@ defmodule SlapWeb.ChatRoomLive do
           socket
       end
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   def handle_info({:message_deleted, message}, socket) do
-    {:noreply, stream_delete(socket, :messages, message)}
+    stream_delete(socket, :messages, message) |> noreply()
   end
 
   def handle_info({:deleted_reply, message}, socket) do
@@ -591,13 +591,13 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_info({:search_results, messages}, socket) do
-    {:noreply, assign(socket, search_results: messages || [])}
+    assign(socket, search_results: messages || []) |> noreply()
   end
 
   def handle_info(%{event: "presence_diff", payload: diff}, socket) do
     online_users = OnlineUsers.update(socket.assigns.online_users, diff)
 
-    {:noreply, assign(socket, online_users: online_users)}
+    assign(socket, online_users: online_users) |> noreply()
   end
 
   def handle_info({:updated_avatar, user}, socket) do
@@ -616,18 +616,18 @@ defmodule SlapWeb.ChatRoomLive do
         socket
       ) do
     # Set the incoming call information to show notification
-    {:noreply,
-     assign(socket,
-       incoming_call: %{
-         user_id: user_id,
-         username: username,
-         call_id: call_id
-       }
-     )}
+    assign(socket,
+      incoming_call: %{
+        user_id: user_id,
+        username: username,
+        call_id: call_id
+      }
+    )
+    |> noreply()
   end
 
   def handle_info(_msg, socket) do
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   defp highlight_message(socket, message) do

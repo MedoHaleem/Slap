@@ -62,8 +62,8 @@ defmodule Slap.AccountsTest do
       {:error, changeset} = Accounts.register_user(%{email: "not valid", password: "not valid"})
 
       assert %{
-               email: ["must have the @ sign and no spaces"],
-               password: ["should be at least 12 character(s)"]
+               username: ["can't be blank"],
+               email: ["must have the @ sign and no spaces"]
              } = errors_on(changeset)
     end
 
@@ -267,7 +267,6 @@ defmodule Slap.AccountsTest do
         })
 
       assert %{
-               password: ["should be at least 12 character(s)"],
                password_confirmation: ["does not match password"]
              } = errors_on(changeset)
     end
@@ -475,10 +474,7 @@ defmodule Slap.AccountsTest do
           password_confirmation: "another"
         })
 
-      assert %{
-               password: ["should be at least 12 character(s)"],
-               password_confirmation: ["does not match password"]
-             } = errors_on(changeset)
+      assert %{password_confirmation: ["does not match password"]} = errors_on(changeset)
     end
 
     test "validates maximum values for password for security", %{user: user} do

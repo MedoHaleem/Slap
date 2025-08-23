@@ -17,7 +17,7 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponent do
           <% :unread_marker -> %>
             <div id={dom_id} class="w-full flex text-red-500 items-center gap-3 pr-5">
               <div class="w-full h-px grow bg-red-500"></div>
-              
+
               <div class="text-sm">New</div>
             </div>
           <% %Message{} -> %>
@@ -51,8 +51,16 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponent do
         "Yesterday"
 
       _ ->
-        format_str = "%A, %B %e#{ordinal(date.day)}#{if today.year != date.year, do: " %Y"}"
-        Timex.format!(date, format_str, :strftime)
+        # Build formatted string explicitly
+        day_name = Timex.format!(date, "%A", :strftime)
+        month_name = Timex.format!(date, "%B", :strftime)
+        day_with_ordinal = "#{date.day}#{ordinal(date.day)}"
+
+        if today.year != date.year do
+          "#{day_name}, #{month_name} #{day_with_ordinal} #{date.year}"
+        else
+          "#{day_name}, #{month_name} #{day_with_ordinal}"
+        end
     end
   end
 

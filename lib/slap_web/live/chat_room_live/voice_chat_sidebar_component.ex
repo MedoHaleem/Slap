@@ -16,7 +16,7 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
       <div class="flex justify-between items-center shrink-0 h-16 border-b border-slate-200 px-4">
         <div class="flex items-center">
           <h2 class="text-lg font-bold text-gray-800">Voice Call</h2>
-          
+
           <div class="ml-2 text-sm text-gray-600">
             <%= if @call_status == "incoming" do %>
               from {@caller.username}
@@ -25,7 +25,7 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
             <% end %>
           </div>
         </div>
-        
+
         <button
           phx-click="toggle_voice_sidebar"
           phx-target={@myself}
@@ -34,23 +34,23 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
           <.icon name="hero-x-mark" class="h-5 w-5" />
         </button>
       </div>
-      
+
       <div class="p-6 flex-1 flex flex-col">
         <div class={"call-status-badge my-4 #{status_color(@call_status)}"}>
           {status_message(@call_status)}
         </div>
-        
+
         <div class="flex-1 flex flex-col items-center justify-center space-y-6">
           <div class={"w-24 h-24 rounded-full flex items-center justify-center #{status_bg_color(@call_status)}"}>
             <.icon name="hero-microphone" class="h-10 w-10 text-gray-500" />
           </div>
-          
+
           <%= if @call_status == "connected" do %>
             <div class="audio-wave mt-2">
               <span></span> <span></span> <span></span> <span></span> <span></span>
             </div>
           <% end %>
-          
+
           <div
             id="voice-chat-container"
             phx-hook="VoiceChat"
@@ -79,7 +79,7 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
                     >
                       <.icon name="hero-phone" class="h-4 w-4 mr-2" /> Accept
                     </button>
-                    
+
                     <button
                       phx-click="reject_call"
                       phx-target={@myself}
@@ -108,7 +108,7 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
                   <div class="mb-2 text-red-600 text-sm">
                     {String.replace_prefix(@call_status, "error: ", "")}
                   </div>
-                  
+
                   <button
                     phx-click="request_call"
                     phx-target={@myself}
@@ -158,6 +158,15 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
     {:noreply, socket}
   end
 
+  # Error handling helper
+  defp extract_error(status) when is_binary(status) do
+    if String.starts_with?(status, "error:") do
+      {true, String.replace_prefix(status, "error: ", "")}
+    else
+      {false, status}
+    end
+  end
+
   # Status message helpers
   defp status_message("init"), do: "Ready to call"
   defp status_message("requesting"), do: "Calling..."
@@ -169,10 +178,9 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
   defp status_message("disconnected"), do: "Call disconnected"
 
   defp status_message(status) when is_binary(status) do
-    if String.starts_with?(status, "error:") do
-      "Error: #{String.replace_prefix(status, "error: ", "")}"
-    else
-      status
+    case extract_error(status) do
+      {true, error_message} -> "Error: #{error_message}"
+      {false, _} -> status
     end
   end
 
@@ -187,10 +195,9 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponent do
   defp status_color("disconnected"), do: "bg-gray-100 text-gray-800"
 
   defp status_color(status) when is_binary(status) do
-    if String.starts_with?(status, "error:") do
-      "bg-red-100 text-red-800"
-    else
-      "bg-gray-100 text-gray-800"
+    case extract_error(status) do
+      {true, _} -> "bg-red-100 text-red-800"
+      {false, _} -> "bg-gray-100 text-gray-800"
     end
   end
 

@@ -39,27 +39,26 @@ defmodule SlapWeb.ChatRoomLive.Edit do
         |> push_navigate(to: ~p"/")
       end
 
-    IO.inspect(socket.assigns.form)
-    {:ok, socket}
+    socket |> ok()
   end
 
   def handle_event("validate-room", %{"room" => room_params}, socket) do
     changeset =
       socket.assigns.room |> Chat.change_room(room_params) |> Map.put(:action, :validate)
 
-    {:noreply, assign_form(socket, changeset)}
+    assign_form(socket, changeset) |> noreply()
   end
 
   def handle_event("save-room", %{"room" => room_params}, socket) do
     case Chat.update_room(socket.assigns.room, room_params) do
       {:ok, room} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Room updated Successfully")
-         |> push_navigate(to: ~p"/rooms/#{room}")}
+        socket
+        |> put_flash(:info, "Room updated Successfully")
+        |> push_navigate(to: ~p"/rooms/#{room}")
+        |> noreply()
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign_form(socket, changeset)}
+        assign_form(socket, changeset) |> noreply()
     end
   end
 

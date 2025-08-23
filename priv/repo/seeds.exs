@@ -11,11 +11,10 @@
 # and so on) as they will fail if something goes wrong.
 
 alias Slap.Accounts
-
+alias Slap.Chat
 alias Slap.Chat.Room
-
 alias Slap.Chat.Message
-
+alias Slap.Chat.Reply
 alias Slap.Repo
 
 names = [
@@ -54,5 +53,16 @@ for {user, message} <- [
        "You cannot wield it! None of us can. The One Ring answers to Sauron alone. It has no other master."},
       {boromir, "And what would a ranger know of this matter?"}
     ] do
-  Repo.insert!(%Message{user: user, room: room, body: message})
+  message = Repo.insert!(%Message{user: user, room: room, body: message})
+
+  # Add some replies to create threads
+  if message.id in [1, 3, 5] do
+    # Add 2-3 replies to selected messages
+    for _ <- 1..(:rand.uniform(2) + 1) do
+      reply_user = Enum.random([elrond, aragorn, boromir])
+      reply_body = Faker.Lorem.Shakespeare.king_richard_iii()
+
+      Chat.create_reply(message, %{body: reply_body}, reply_user)
+    end
+  end
 end

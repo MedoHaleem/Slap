@@ -62,7 +62,7 @@ defmodule Slap.MixProject do
       {:timex, "~> 3.7"},
       {:faker, "~> 0.18", only: :dev},
       {:paginator, "~> 1.2.0"},
-      {:tidewave, "~> 0.1.2", only: :dev}
+      {:tidewave, "~> 0.4", only: :dev}
     ]
   end
 

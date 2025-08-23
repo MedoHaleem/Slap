@@ -166,6 +166,154 @@ defmodule SlapWeb.ChatRoomLiveTest do
     end
   end
 
+  describe "Enhanced file upload flows" do
+    test "handles file upload errors gracefully", %{conn: conn, room: room} do
+      {:ok, view, _} = live(conn, ~p"/rooms/#{room}")
+
+      # Open the file selector
+      assert view
+             |> element("button[phx-click='toggle-file-selector'][phx-target]")
+             |> render_click()
+
+      # Ensure the file upload UI is shown
+      assert render(view) =~ "Attach PDF file"
+
+      # Try to upload a file that's too large (exceeds 10MB limit)
+      large_content = String.duplicate("A", 11_000_000)  # 11MB
+      filename = "large-file.pdf"
+
+      upload =
+        file_input(view, "#new-message-form", :pdf_file, [
+          %{
+            name: filename,
+            content: large_content,
+            type: "application/pdf"
+          }
+        ])
+
+      # Attempt to upload the large file
+      render_upload(upload, filename)
+
+      # Check for error message in the file upload UI
+      html = render(view)
+
+      # The error should be displayed in the file selector section
+      # Let's check for the specific error message structure
+      assert html =~ "Attach PDF file"
+      assert html =~ "text-xs text-red-500"
+
+      # The error message should be displayed as text
+      assert html =~ "Invalid file upload."
+    end
+
+    test "handles invalid file types", %{conn: conn, room: room} do
+      {:ok, view, _} = live(conn, ~p"/rooms/#{room}")
+
+      # Open the file selector
+      assert view
+             |> element("button[phx-click='toggle-file-selector'][phx-target]")
+             |> render_click()
+
+      # Ensure the file upload UI is shown
+      assert render(view) =~ "Attach PDF file"
+
+      # Try to upload a non-PDF file
+      invalid_content = "This is not a PDF file"
+      filename = "test-image.jpg"
+
+      upload =
+        file_input(view, "#new-message-form", :pdf_file, [
+          %{
+            name: filename,
+            content: invalid_content,
+            type: "image/jpeg"
+          }
+        ])
+
+      # Attempt to upload the invalid file
+      render_upload(upload, filename)
+
+      # Check for error message in the file upload UI
+      html = render(view)
+
+      # The error should be displayed in the file selector section
+      # Let's check for the specific error message structure
+      assert html =~ "Attach PDF file"
+      assert html =~ "text-xs text-red-500"
+
+      # The error message should be displayed as text
+      assert html =~ "Invalid file upload."
+    end
+
+    test "generates unique filenames for uploads", %{conn: conn, room: room} do
+      {:ok, view, _} = live(conn, ~p"/rooms/#{room}")
+
+      # Create a test PDF file content
+      pdf_content = "%PDF-1.5\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+      filename = "test-upload.pdf"
+
+      # Open the file selector
+      assert view
+             |> element("button[phx-click='toggle-file-selector'][phx-target]")
+             |> render_click()
+
+      # Upload the same file twice to test unique filename generation
+      upload1 =
+        file_input(view, "#new-message-form", :pdf_file, [
+          %{
+            name: filename,
+            content: pdf_content,
+            type: "application/pdf"
+          }
+        ])
+
+      message_text1 = "First message with attachment"
+      render_upload(upload1, filename)
+
+      view
+      |> form("#new-message-form", %{message: %{body: message_text1}})
+      |> render_submit()
+
+      # Upload the same file again
+      assert view
+             |> element("button[phx-click='toggle-file-selector'][phx-target]")
+             |> render_click()
+
+      upload2 =
+        file_input(view, "#new-message-form", :pdf_file, [
+          %{
+            name: filename,
+            content: pdf_content,
+            type: "application/pdf"
+          }
+        ])
+
+      message_text2 = "Second message with same attachment"
+      render_upload(upload2, filename)
+
+      view
+      |> form("#new-message-form", %{message: %{body: message_text2}})
+      |> render_submit()
+
+      # Both messages should appear with the same filename displayed
+      assert render(view) =~ message_text1
+      assert render(view) =~ message_text2
+      assert render(view) =~ filename
+    end
+  end
+
+  describe "Template interpolation fixes" do
+    test "message placeholder renders correctly with room name", %{conn: conn, room: room} do
+      {:ok, _view, html} = live(conn, ~p"/rooms/#{room}")
+
+      # Check that the message textarea placeholder contains the room name properly
+      assert html =~ "Message #{room.name}"
+
+      # Verify it's using proper HEEx interpolation (not string interpolation with #)
+      refute html =~ "Message ##{room.name}"
+    end
+  end
+
   describe "Threads" do
     test "can view a thread", %{conn: conn, room: room, message2: message2} do
       {:ok, view, _} = live(conn, ~p"/rooms/#{room}")

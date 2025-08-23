@@ -15,12 +15,12 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
           </h1>
         </div>
       </div>
-      
+
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3">
           <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
         </div>
-        
+
         <div id="rooms-list">
           <.room_link
             :for={{room, unread_count} <- @rooms}
@@ -40,10 +40,10 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
                   >
                     Browse rooms
                   </div>
-                  
+
                   <div
                     phx-click={
-                      JS.navigate(~p"/rooms/#{@current_room}/new") |> show_modal("new-room-modal")
+                      JS.navigate(~p"/rooms/#{@current_room_id}/new") |> show_modal("new-room-modal")
                     }
                     class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
                   >
@@ -54,24 +54,24 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             </div>
           </button>
         </div>
-        
+
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
             <.link
-              patch={~p"/search/#{@current_room}"}
+              patch={~p"/search/#{@current_room_id}"}
               class="flex items-center grow hover:bg-slate-200 px-2 py-1 rounded"
             >
               <.icon name="hero-magnifying-glass" class="h-4 w-4" />
               <span class="ml-2 leading-none font-medium text-sm">Search</span>
             </.link>
           </div>
-          
+
           <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
             </div>
           </div>
-          
+
           <div id="users-list">
             <.user
               :for={user <- @users}
@@ -136,7 +136,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         </div>
          <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
-      
+
       <%= if @online && @user.id != @current_user.id do %>
         <a
           href={~p"/voice-chat/#{@user.id}"}

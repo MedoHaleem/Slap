@@ -132,6 +132,28 @@ defmodule Slap.Accounts do
     Phoenix.PubSub.subscribe(@pubsub, @user_avatar_topic)
   end
 
+  @doc """
+  Updates a user's basic information and avatar path.
+
+  ## Examples
+
+      iex> update_user(user, %{username: "new_username", email: "new@example.com", avatar_path: "/path/to/avatar.png"})
+      {:ok, %User{}}
+
+      iex> update_user(user, %{username: ""})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def update_user(%User{} = user, attrs) do
+    user
+    |> User.registration_changeset(attrs,
+      hash_password: false,
+      validate_email: false,
+      validate_username: false
+    )
+    |> Repo.update()
+  end
+
   ## Settings
 
   @doc """

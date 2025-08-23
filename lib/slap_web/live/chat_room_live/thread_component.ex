@@ -24,9 +24,9 @@ defmodule SlapWeb.ChatRoomLive.ThreadComponent do
       <div class="flex items-center shrink-0 h-16 border-b border-slate-300 px-4">
         <div>
           <h2 class="text-sm font-semibold leading-none">Thread</h2>
-           <a class="text-xs leading-none" href="#">#{@room.name}</a>
+           <a class="text-xs leading-none" href="#">{@room.name}</a>
         </div>
-        
+
         <button
           class="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-300 ml-auto"
           phx-click="close-thread"
@@ -34,7 +34,7 @@ defmodule SlapWeb.ChatRoomLive.ThreadComponent do
           <.icon name="hero-x-mark" class="w-5 h-5" />
         </button>
       </div>
-      
+
       <div id="thread-message-with-replies" class="flex flex-col grow overflow-auto">
         <div class="border-b border-slate-300">
           <.message
@@ -45,7 +45,7 @@ defmodule SlapWeb.ChatRoomLive.ThreadComponent do
             timezone={@timezone}
           />
         </div>
-        
+
         <div id="thread-replies" phx-update="stream">
           <.message
             :for={{dom_id, reply} <- @streams.replies}
@@ -58,7 +58,7 @@ defmodule SlapWeb.ChatRoomLive.ThreadComponent do
           />
         </div>
       </div>
-      
+
       <div class="bg-slate-100 px-4 pt-3 mt-auto">
         <div :if={@joined?} class="h-12 pb-4">
           <.form

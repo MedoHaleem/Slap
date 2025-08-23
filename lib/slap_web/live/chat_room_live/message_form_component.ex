@@ -1,9 +1,11 @@
 defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
   use SlapWeb, :live_component
 
+  alias Slap.Chat
+
   @impl true
   def mount(socket) do
-    {:ok, assign(socket, pdf_file: nil, show_file_selector: false)}
+    assign(socket, show_file_selector: false) |> ok()
   end
 
   @impl true
@@ -25,7 +27,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             cols=""
             id="chat-message-textarea"
             name={@form[:body].name}
-            placeholder={"Message ##{@room.name}"}
+            placeholder={"Message #{@room.name}"}
             phx-debounce
             phx-hook="ChatMessageTextArea"
             rows="1"
@@ -40,7 +42,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             >
               <.icon name="hero-paper-clip" class="h-4 w-4" />
             </button>
-            
+
             <button
               type="submit"
               class="shrink flex items-center justify-center h-6 w-6 rounded hover:bg-slate-200"
@@ -49,7 +51,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
             </button>
           </div>
         </div>
-        
+
         <div :if={@show_file_selector} class="mt-2 p-2 border border-slate-200 rounded bg-slate-50">
           <div class="flex flex-col">
             <label class="text-sm text-slate-700 mb-1">Attach PDF file</label>
@@ -59,7 +61,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
                 {error_to_string(error)}
               </span>
             </div>
-            
+
             <div
               :for={entry <- @uploads.pdf_file.entries}
               class="mt-2 flex items-center justify-between"
@@ -69,7 +71,7 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
                 <span class="text-xs truncate max-w-[150px]">{entry.client_name}</span>
                 <span class="text-xs text-slate-500">{format_bytes(entry.client_size)}</span>
               </div>
-              
+
               <button
                 type="button"
                 phx-click="cancel-upload"
@@ -99,13 +101,13 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
         max_file_size: 10_240_000
       )
 
-    {:ok, socket}
+    socket |> ok()
   end
 
   @impl true
   def handle_event("validate-message", %{"message" => message_params}, socket) do
-    changeset = Slap.Chat.change_message(%Slap.Chat.Message{}, message_params)
-    {:noreply, assign(socket, form: to_form(changeset))}
+    changeset = Chat.change_message(%Chat.Message{}, message_params)
+    assign(socket, form: to_form(changeset)) |> noreply()
   end
 
   @impl true
@@ -117,34 +119,34 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
 
     # Don't submit empty messages with no attachments
     if String.trim(message_params["body"] || "") == "" && !has_attachments?(socket) do
-      {:noreply, socket}
+      socket |> noreply()
     else
-      case Slap.Chat.create_message(room, message_params, current_user) do
+      case Chat.create_message(room, message_params, current_user) do
         {:ok, _message} ->
           # Reset the form
-          changeset = Slap.Chat.change_message(%Slap.Chat.Message{})
+          changeset = Chat.change_message(%Chat.Message{})
 
           socket =
             socket
             |> assign(form: to_form(changeset), show_file_selector: false)
             |> push_event("chat_message_submitted", %{})
 
-          {:noreply, socket}
+          socket |> noreply()
 
         {:error, changeset} ->
-          {:noreply, assign(socket, form: to_form(changeset))}
+          assign(socket, form: to_form(changeset)) |> noreply()
       end
     end
   end
 
   @impl true
   def handle_event("toggle-file-selector", _, socket) do
-    {:noreply, assign(socket, show_file_selector: !socket.assigns.show_file_selector)}
+    assign(socket, show_file_selector: !socket.assigns.show_file_selector) |> noreply()
   end
 
   @impl true
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :pdf_file, ref)}
+    cancel_upload(socket, :pdf_file, ref) |> noreply()
   end
 
   defp process_file_uploads(message_params, socket) do
@@ -154,9 +156,14 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
         # Consume the upload immediately and get the upload
         upload =
           consume_uploaded_entries(socket, :pdf_file, fn %{path: path}, entry ->
-            # Generate a unique filename
-            unique_filename = "#{generate_unique_id()}-#{entry.client_name}"
-            dest = Path.join("priv/static/uploads", unique_filename)
+            # Ensure uploads directory exists
+            uploads_dir = "priv/static/uploads"
+            File.mkdir_p!(uploads_dir)
+
+            # Generate a unique filename with extension to avoid collisions
+            original_ext = Path.extname(entry.client_name)
+            unique_filename = "#{generate_unique_id()}#{original_ext}"
+            dest = Path.join(uploads_dir, unique_filename)
 
             # Copy the file to the uploads directory
             File.cp!(path, dest)
@@ -195,8 +202,8 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
     end
   end
 
-  defp error_to_string(:too_large), do: "File is too large. Maximum size is 10MB."
-  defp error_to_string(:not_accepted), do: "Only PDF files are accepted."
+  defp error_to_string(:too_large), do: "File is too large"
+  defp error_to_string(:not_accepted), do: "Only PDF files are accepted"
   defp error_to_string(:too_many_files), do: "You can only upload one file at a time."
   defp error_to_string(_), do: "Invalid file upload."
 
