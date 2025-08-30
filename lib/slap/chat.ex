@@ -72,9 +72,7 @@ defmodule Slap.Chat do
   end
 
   def joined?(%Room{} = room, %User{} = user) do
-    Repo.exists?(
-      from rm in RoomMembership, where: rm.room_id == ^room.id and rm.user_id == ^user.id
-    )
+    get_membership(room, user) != nil
   end
 
   def update_last_read_id(room, user) do

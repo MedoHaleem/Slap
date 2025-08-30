@@ -1,3 +1,5 @@
+import { highlightMessage } from "../utils/messageHighlight.js";
+
 export default {
   mounted() {
     this.handleEvent("show_chat_messages", () => {
@@ -35,23 +37,9 @@ export default {
       });
     }
 
-    // Handle scroll to message functionality
+    // Handle scroll to message functionality - consolidated with shared utility
     this.handleEvent("scroll-to-message", (event) => {
-      const messageId = event.detail;
-      const messageElement = document.getElementById(`messages-${messageId}`);
-      if (messageElement) {
-        // Scroll the message into view with smooth scrolling
-        messageElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center'
-        });
-        
-        // Add a temporary highlight effect
-        messageElement.classList.add('bg-yellow-200', 'transition-colors');
-        setTimeout(() => {
-          messageElement.classList.remove('bg-yellow-200');
-        }, 2000);
-      }
+      highlightMessage(event.detail);
     });
   },
 
