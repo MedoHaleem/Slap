@@ -88,7 +88,7 @@ defmodule SlapWeb.MessageSearchLive do
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex items-center">
                       <span class="font-medium text-gray-900">{message.user.username}</span>
-                      <%= if message.type == :reply do %>
+                      <%= if Map.get(message, :type) == :reply do %>
                         <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
                           In Thread
                         </span>
@@ -101,7 +101,7 @@ defmodule SlapWeb.MessageSearchLive do
 
                    <.link
                      navigate={
-                       if message.type == :reply,
+                       if Map.get(message, :type) == :reply,
                          do:
                            ~p"/rooms/#{@room}?thread=#{message.parent_message_id}&highlight=#{message.id}",
                          else: ~p"/rooms/#{@room}?highlight=#{message.id}"
@@ -114,7 +114,7 @@ defmodule SlapWeb.MessageSearchLive do
 
                   <div class="text-gray-700 leading-relaxed">
                     {raw(highlight_search_terms(message.body, @search_query))}
-                    <%= if message.type == :reply do %>
+                    <%= if Map.get(message, :type) == :reply do %>
                       <div class="mt-2 text-sm text-gray-500">
                         <em>Reply to: {String.slice(message.parent_message.body, 0..50)}...</em>
                       </div>
