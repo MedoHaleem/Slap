@@ -53,6 +53,14 @@ defmodule Slap.ChatFixtures do
     attachment
   end
 
+  def reply_fixture(%Message{} = message, attrs \\ %{}) do
+    attrs = Enum.into(attrs, %{body: "Test reply #{System.unique_integer([:positive])}"})
+
+    {:ok, reply} = Chat.create_reply(message, attrs, message.user)
+
+    reply
+  end
+
   def join_room(%Room{} = room, %User{} = user) do
     Chat.join_room!(room, user)
   end

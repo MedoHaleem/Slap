@@ -247,7 +247,15 @@ defmodule Slap.Chat do
       []
     else
       # Use PostgreSQL's full-text search for better performance
-      search_query = "#{query}:*"
+      # Properly escape the query for tsquery by replacing spaces with & and escaping special characters
+      # Remove special characters that are not allowed in tsquery
+      cleaned_query = String.replace(query, ~r/[&|!<>():*]/, " ")
+      search_terms = String.split(cleaned_query, ~r/\s+/, trim: true)
+      search_query = if length(search_terms) > 1 do
+        Enum.join(search_terms, " & ")
+      else
+        Enum.join(search_terms, "")
+      end
 
       main_messages_query =
         Message
@@ -327,7 +335,15 @@ defmodule Slap.Chat do
       0
     else
       # Use PostgreSQL's full-text search for better performance
-      search_query = "#{query}:*"
+      # Properly escape the query for tsquery by replacing spaces with & and escaping special characters
+      # Remove special characters that are not allowed in tsquery
+      cleaned_query = String.replace(query, ~r/[&|!<>():*]/, " ")
+      search_terms = String.split(cleaned_query, ~r/\s+/, trim: true)
+      search_query = if length(search_terms) > 1 do
+        Enum.join(search_terms, " & ")
+      else
+        Enum.join(search_terms, "")
+      end
 
       # Count main messages
       main_message_count =

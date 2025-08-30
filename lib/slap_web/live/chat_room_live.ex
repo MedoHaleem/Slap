@@ -45,6 +45,7 @@ defmodule SlapWeb.ChatRoomLive do
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
+        %Slap.Chat.Reply{id: id} -> "replies-#{id}"
         :unread_marker -> "messages-unread-marker"
         %Date{} = date -> to_string(date)
       end
@@ -468,7 +469,7 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_event("toggle-topic", _, socket) do
-    update(socket, :show_topic, fn show -> !show end) |> noreply()
+    update(socket, :hide_topic?, fn hide -> !hide end) |> noreply()
   end
 
   def handle_event("show-profile", %{"user-id" => user_id}, socket) do
@@ -686,13 +687,38 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   defp refresh_message(socket, message) do
-    if message.room_id == socket.assigns.room.id do
-      socket = stream_insert(socket, :messages, message)
+    # Handle both Message and Reply structs
+    room_id = case message do
+      %{room_id: room_id} -> room_id
+      %{message: %{room_id: room_id}} -> room_id
+      _ -> nil
+    end
 
-      if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
-        assign(socket, :thread, message)
-      else
-        socket
+    if room_id == socket.assigns.room.id do
+      # Only stream messages, not replies (replies are handled within their parent messages)
+      case message do
+        %Slap.Chat.Message{} ->
+          socket = stream_insert(socket, :messages, message)
+
+          if socket.assigns[:thread] && socket.assigns.thread.id == message.id do
+            assign(socket, :thread, message)
+          else
+            socket
+          end
+
+        %Slap.Chat.Reply{} ->
+          # For replies, we need to refresh the parent message
+          parent_message = Chat.get_message!(message.message_id)
+          socket = stream_insert(socket, :messages, parent_message)
+
+          if socket.assigns[:thread] && socket.assigns.thread.id == parent_message.id do
+            assign(socket, :thread, parent_message)
+          else
+            socket
+          end
+
+        _ ->
+          socket
       end
     else
       socket
