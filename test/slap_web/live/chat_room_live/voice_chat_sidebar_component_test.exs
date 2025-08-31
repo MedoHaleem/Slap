@@ -4,7 +4,7 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponentTest do
   import Phoenix.LiveViewTest
   import Slap.AccountsFixtures
 
-  setup %{conn: conn} do
+  setup %{conn: _conn} do
     user = user_fixture(%{username: "TestUser"})
     caller = user_fixture(%{username: "CallerUser"})
     target = user_fixture(%{username: "TargetUser"})
@@ -181,6 +181,5 @@ defmodule SlapWeb.ChatRoomLive.VoiceChatSidebarComponentTest do
       assert html =~ "Voice Call"
       assert html =~ "Call disconnected"
     end
-
   end
 end

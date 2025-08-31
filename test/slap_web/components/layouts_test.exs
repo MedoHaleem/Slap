@@ -5,14 +5,21 @@ defmodule SlapWeb.LayoutsTest do
   import Phoenix.Template
 
   test "renders app layout" do
-    html = render_to_string(SlapWeb.Layouts, "app", "html", flash: %{}, inner_content: "<p>Test content</p>")
+    html =
+      render_to_string(SlapWeb.Layouts, "app", "html",
+        flash: %{},
+        inner_content: "<p>Test content</p>"
+      )
+
     assert html =~ "flex w-full h-screen"
     assert html =~ "Test content"
     assert html =~ "flash-group"
   end
 
   test "renders root layout" do
-    html = render_to_string(SlapWeb.Layouts, "root", "html", inner_content: "<div>Page content</div>")
+    html =
+      render_to_string(SlapWeb.Layouts, "root", "html", inner_content: "<div>Page content</div>")
+
     assert html =~ "<!DOCTYPE html>"
     assert html =~ "lang=\"en\""
     assert html =~ "Page content"
@@ -22,10 +29,12 @@ defmodule SlapWeb.LayoutsTest do
   end
 
   test "root layout includes page title" do
-    html = render_to_string(SlapWeb.Layouts, "root", "html",
-      inner_content: "<div>Content</div>",
-      page_title: "Test Page"
-    )
+    html =
+      render_to_string(SlapWeb.Layouts, "root", "html",
+        inner_content: "<div>Content</div>",
+        page_title: "Test Page"
+      )
+
     assert html =~ "Test Page"
     assert html =~ "Slap"
   end

@@ -82,7 +82,7 @@ defmodule SlapWeb.ChatRoomLive.Index do
                 </.link>
               <% end %>
             </li>
-             <.page_number :for={i <- 1..@num_pages} number={i} current?={i == @page} />
+            <.page_number :for={i <- 1..@num_pages} number={i} current?={i == @page} />
             <li>
               <%= if @page + 1 > @num_pages do %>
                 <span class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg opacity-50 cursor-not-allowed">

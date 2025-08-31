@@ -24,7 +24,7 @@ defmodule SlapWeb.ChatRoomLive.ThreadComponent do
       <div class="flex items-center shrink-0 h-16 border-b border-slate-300 px-4">
         <div>
           <h2 class="text-sm font-semibold leading-none">Thread</h2>
-           <a class="text-xs leading-none" href="#">{@room.name}</a>
+          <a class="text-xs leading-none" href="#">{@room.name}</a>
         </div>
 
         <button

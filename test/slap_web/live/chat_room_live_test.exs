@@ -179,7 +179,8 @@ defmodule SlapWeb.ChatRoomLiveTest do
       assert render(view) =~ "Attach PDF file"
 
       # Try to upload a file that's too large (exceeds 10MB limit)
-      large_content = String.duplicate("A", 11_000_000)  # 11MB
+      # 11MB
+      large_content = String.duplicate("A", 11_000_000)
       filename = "large-file.pdf"
 
       upload =
@@ -415,7 +416,12 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Simulate incoming call (this would normally come via PubSub)
       socket = view.pid
-      Process.send(socket, {:voice_call_request, %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}}, [])
+
+      Process.send(
+        socket,
+        {:voice_call_request, %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}},
+        []
+      )
 
       # Give time for the message to be processed
       :timer.sleep(100)
@@ -498,7 +504,8 @@ defmodule SlapWeb.ChatRoomLiveTest do
       {:ok, _view, html} = live(conn, ~p"/rooms")
 
       # Should load some room (the first one)
-      assert html =~ "room" # Generic check since we don't know which room
+      # Generic check since we don't know which room
+      assert html =~ "room"
     end
 
     test "handles thread parameter with invalid ID", %{conn: conn, room: room} do
@@ -536,7 +543,8 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Try to send message with invalid data
       view
-      |> form("#new-message-form", %{message: %{body: String.duplicate("a", 10000)}}) # Very long message
+      # Very long message
+      |> form("#new-message-form", %{message: %{body: String.duplicate("a", 10000)}})
       |> render_submit()
 
       # Should handle validation error gracefully
@@ -660,7 +668,12 @@ defmodule SlapWeb.ChatRoomLiveTest do
       assert render(view) =~ room.name
     end
 
-    test "handles remove reaction event", %{conn: conn, room: room, message2: message2, user: user} do
+    test "handles remove reaction event", %{
+      conn: conn,
+      room: room,
+      message2: message2,
+      user: user
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # Test that the remove reaction event handler exists and can be called
@@ -680,7 +693,13 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Simulate incoming call
       socket = view.pid
-      Process.send(socket, {:voice_call_request, %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}}, [])
+
+      Process.send(
+        socket,
+        {:voice_call_request, %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}},
+        []
+      )
+
       :timer.sleep(100)
 
       # Should handle the message without crashing
@@ -692,7 +711,13 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Simulate incoming call with invalid data
       socket = view.pid
-      Process.send(socket, {:voice_call_request, %{from_user_id: nil, from_username: nil, call_id: nil}}, [])
+
+      Process.send(
+        socket,
+        {:voice_call_request, %{from_user_id: nil, from_username: nil, call_id: nil}},
+        []
+      )
+
       :timer.sleep(100)
 
       # Should handle gracefully without crashing
@@ -881,7 +906,11 @@ defmodule SlapWeb.ChatRoomLiveTest do
   end
 
   describe "Reaction operations" do
-    test "handles add-reaction event with valid emoji", %{conn: conn, room: room, message2: message2} do
+    test "handles add-reaction event with valid emoji", %{
+      conn: conn,
+      room: room,
+      message2: message2
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # Test add-reaction event handler
@@ -899,7 +928,12 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Test remove-reaction event handler
       socket = view.pid
-      Process.send(socket, {"remove-reaction", %{"message_id" => message2.id, "emoji" => "👍"}}, [])
+
+      Process.send(
+        socket,
+        {"remove-reaction", %{"message_id" => message2.id, "emoji" => "👍"}},
+        []
+      )
 
       :timer.sleep(100)
 
@@ -914,7 +948,15 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # First simulate an incoming call
       socket = view.pid
-      Process.send(socket, %{event: "voice_call_request", payload: %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}}, [])
+
+      Process.send(
+        socket,
+        %{
+          event: "voice_call_request",
+          payload: %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}
+        },
+        []
+      )
 
       :timer.sleep(100)
 
@@ -932,7 +974,15 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # First simulate an incoming call
       socket = view.pid
-      Process.send(socket, %{event: "voice_call_request", payload: %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}}, [])
+
+      Process.send(
+        socket,
+        %{
+          event: "voice_call_request",
+          payload: %{from_user_id: 123, from_username: "Caller", call_id: "call-123"}
+        },
+        []
+      )
 
       :timer.sleep(100)
 
@@ -963,7 +1013,12 @@ defmodule SlapWeb.ChatRoomLiveTest do
       assert render(view) =~ room.name
     end
 
-    test "handles new_message broadcast for different room", %{conn: conn, room: room, another_room: another_room, user: user} do
+    test "handles new_message broadcast for different room", %{
+      conn: conn,
+      room: room,
+      another_room: another_room,
+      user: user
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # Create a message in a different room
@@ -1027,7 +1082,11 @@ defmodule SlapWeb.ChatRoomLiveTest do
       assert render(view) =~ room.name
     end
 
-    test "exercises maybe_update_profile helper", %{conn: conn, room: room, another_user: another_user} do
+    test "exercises maybe_update_profile helper", %{
+      conn: conn,
+      room: room,
+      another_user: another_user
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # First show profile to set up the state
@@ -1062,11 +1121,16 @@ defmodule SlapWeb.ChatRoomLiveTest do
   end
 
   describe "Search results rendering" do
-    test "handles search with existing message content", %{conn: conn, room: room, message1: message1} do
+    test "handles search with existing message content", %{
+      conn: conn,
+      room: room,
+      message1: message1
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # Search for part of the existing message content
-      search_term = String.slice(message1.body, 0, 5)  # Take first 5 characters
+      # Take first 5 characters
+      search_term = String.slice(message1.body, 0, 5)
 
       # Perform search
       view
@@ -1126,7 +1190,15 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Simulate incoming call to trigger modal rendering
       socket = view.pid
-      Process.send(socket, %{event: "voice_call_request", payload: %{from_user_id: 123, from_username: "TestCaller", call_id: "test-call-123"}}, [])
+
+      Process.send(
+        socket,
+        %{
+          event: "voice_call_request",
+          payload: %{from_user_id: 123, from_username: "TestCaller", call_id: "test-call-123"}
+        },
+        []
+      )
 
       :timer.sleep(100)
 
@@ -1142,7 +1214,15 @@ defmodule SlapWeb.ChatRoomLiveTest do
 
       # Simulate incoming call
       socket = view.pid
-      Process.send(socket, %{event: "voice_call_request", payload: %{from_user_id: 123, from_username: "TestCaller", call_id: "test-call-123"}}, [])
+
+      Process.send(
+        socket,
+        %{
+          event: "voice_call_request",
+          payload: %{from_user_id: 123, from_username: "TestCaller", call_id: "test-call-123"}
+        },
+        []
+      )
 
       :timer.sleep(100)
 
@@ -1155,7 +1235,11 @@ defmodule SlapWeb.ChatRoomLiveTest do
   end
 
   describe "Thread component rendering" do
-    test "renders thread component with message info", %{conn: conn, room: room, message2: message2} do
+    test "renders thread component with message info", %{
+      conn: conn,
+      room: room,
+      message2: message2
+    } do
       {:ok, view, _html} = live(conn, ~p"/rooms/#{room}")
 
       # Open thread
@@ -1176,7 +1260,8 @@ defmodule SlapWeb.ChatRoomLiveTest do
       reply = reply_fixture(message2, %{body: "Reply to highlight"})
 
       # Open thread with highlight parameter
-      {:ok, _view, _html} = live(conn, ~p"/rooms/#{room}?thread=#{message2.id}&highlight=#{reply.id}")
+      {:ok, _view, _html} =
+        live(conn, ~p"/rooms/#{room}?thread=#{message2.id}&highlight=#{reply.id}")
 
       # Should render thread with highlight
       # This test ensures the thread component rendering path is covered

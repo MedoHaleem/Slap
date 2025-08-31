@@ -15,12 +15,12 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
           </h1>
         </div>
       </div>
-
+      
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3">
           <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
         </div>
-
+        
         <div id="rooms-list">
           <.room_link
             :for={{room, unread_count} <- @rooms}
@@ -40,7 +40,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
                   >
                     Browse rooms
                   </div>
-
+                  
                   <div
                     phx-click={
                       JS.navigate(~p"/rooms/#{@current_room_id}/new") |> show_modal("new-room-modal")
@@ -54,7 +54,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             </div>
           </button>
         </div>
-
+        
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
             <.link
@@ -65,13 +65,13 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
               <span class="ml-2 leading-none font-medium text-sm">Search</span>
             </.link>
           </div>
-
+          
           <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
             </div>
           </div>
-
+          
           <div id="users-list">
             <.user
               :for={user <- @users}
@@ -136,17 +136,33 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         </div>
          <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
-
-      <%= if @online && @user.id != @current_user.id do %>
-        <a
-          href={~p"/voice-chat/#{@user.id}"}
-          target="_blank"
-          class="voice-chat-btn opacity-0 group-hover:opacity-100"
-          title="Start voice chat in new window"
-        >
-          <.icon name="hero-microphone" class="h-4 w-4 text-gray-600 hover:text-gray-800" />
-        </a>
-      <% end %>
+      
+      <div class="flex items-center space-x-2">
+        <%= if @online && @user.id != @current_user.id do %>
+          <a
+            href={~p"/voice-chat/#{@user.id}"}
+            target="_blank"
+            class="voice-chat-btn opacity-0 group-hover:opacity-100"
+            title="Start voice chat in new window"
+          >
+            <.icon name="hero-microphone" class="h-4 w-4 text-gray-600 hover:text-gray-800" />
+          </a>
+        <% end %>
+        
+        <%= if @user.id != @current_user.id do %>
+          <button
+            phx-click="start-direct-message"
+            phx-value-user-id={@user.id}
+            class="opacity-0 group-hover:opacity-100"
+            title="Send direct message"
+          >
+            <.icon
+              name="hero-chat-bubble-bottom-center-text"
+              class="h-4 w-4 text-gray-600 hover:text-blue-600"
+            />
+          </button>
+        <% end %>
+      </div>
     </div>
     """
   end

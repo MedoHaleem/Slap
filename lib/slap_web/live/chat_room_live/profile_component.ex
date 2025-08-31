@@ -65,9 +65,9 @@ defmodule SlapWeb.ChatRoomLive.ProfileComponent do
               <label class="block mb-2 font-semibold text-lg text-gray-800">
                 Upload avatar
               </label>
-               <.live_file_input upload={@uploads.avatar} class="w-full" />
+              <.live_file_input upload={@uploads.avatar} class="w-full" />
             </.form>
-             <hr class="mt-4" />
+            <hr class="mt-4" />
           <% else %>
             <.user_avatar user={@user} class="w-48 rounded mx-auto" />
           <% end %>

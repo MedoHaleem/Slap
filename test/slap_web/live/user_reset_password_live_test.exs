@@ -39,9 +39,7 @@ defmodule SlapWeb.UserResetPasswordLiveTest do
       result =
         lv
         |> element("#reset_password_form")
-        |> render_change(
-          user: %{"password" => "123", "password_confirmation" => "secret123456"}
-        )
+        |> render_change(user: %{"password" => "123", "password_confirmation" => "secret123456"})
 
       assert result =~ "should be at least 4 character(s)"
       assert result =~ "does not match password"

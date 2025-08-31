@@ -27,7 +27,7 @@ defmodule Slap.Chat.MessageAttachmentTest do
       assert Map.has_key?(errors, :file_name)
       assert Map.has_key?(errors, :file_type)
       assert Map.has_key?(errors, :file_size)
-      assert Map.has_key?(errors, :message_id)
+      assert Map.has_key?(errors, :base)
     end
 
     test "validates PDF file type" do
@@ -63,7 +63,8 @@ defmodule Slap.Chat.MessageAttachmentTest do
         file_name: "test.pdf",
         file_type: "application/pdf",
         file_size: 1024,
-        message_id: 999 # Non-existent message ID
+        # Non-existent message ID
+        message_id: 999
       }
 
       changeset = MessageAttachment.changeset(%MessageAttachment{}, attrs)
@@ -165,7 +166,7 @@ defmodule Slap.Chat.MessageAttachmentTest do
       changeset = MessageAttachment.upload_changeset(%MessageAttachment{}, attrs)
 
       refute changeset.valid?
-      assert %{message_id: ["can't be blank"]} = errors_on(changeset)
+      assert %{base: ["Must belong to either message or direct message"]} = errors_on(changeset)
 
       File.rm!(temp_path)
     end

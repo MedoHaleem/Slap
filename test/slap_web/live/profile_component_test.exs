@@ -123,7 +123,8 @@ defmodule SlapWeb.ProfileComponentTest do
       |> render_click()
 
       # Try to upload a file that's too large (exceeds 2MB limit)
-      large_content = String.duplicate("A", 2_100_000)  # 2.1MB
+      # 2.1MB
+      large_content = String.duplicate("A", 2_100_000)
       filename = "large-image.jpg"
 
       upload =

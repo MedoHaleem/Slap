@@ -87,7 +87,20 @@ defmodule SlapWeb.MessageSearchLive do
                 <div class="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex items-center">
-                      <span class="font-medium text-gray-900">{message.user.username}</span>
+                      <div class="group relative inline-flex items-center">
+                        <span class="font-medium text-gray-900">{message.user.username}</span>
+                        <%= if message.user.id != @current_user.id do %>
+                          <button
+                            phx-click="start-direct-message"
+                            phx-value-user-id={message.user.id}
+                            class="ml-1 hidden group-hover:inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100"
+                            title="Send direct message"
+                          >
+                            <.icon name="hero-chat-bubble-bottom-center-text" class="h-3 w-3" />
+                          </button>
+                        <% end %>
+                      </div>
+
                       <%= if Map.get(message, :type) == :reply do %>
                         <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
                           In Thread
@@ -99,17 +112,17 @@ defmodule SlapWeb.MessageSearchLive do
                       </span>
                     </div>
 
-                   <.link
-                     navigate={
-                       if Map.get(message, :type) == :reply,
-                         do:
-                           ~p"/rooms/#{@room}?thread=#{message.parent_message_id}&highlight=#{message.id}",
-                         else: ~p"/rooms/#{@room}?highlight=#{message.id}"
-                     }
-                     class="text-blue-500 hover:text-blue-700 text-sm"
-                   >
-                     View in context
-                   </.link>
+                    <.link
+                      navigate={
+                        if Map.get(message, :type) == :reply,
+                          do:
+                            ~p"/rooms/#{@room}?thread=#{message.parent_message_id}&highlight=#{message.id}",
+                          else: ~p"/rooms/#{@room}?highlight=#{message.id}"
+                      }
+                      class="text-blue-500 hover:text-blue-700 text-sm"
+                    >
+                      View in context
+                    </.link>
                   </div>
 
                   <div class="text-gray-700 leading-relaxed">
@@ -132,6 +145,14 @@ defmodule SlapWeb.MessageSearchLive do
       <% end %>
     </div>
     """
+  end
+
+  def handle_event("start-direct-message", %{"user-id" => user_id}, socket) do
+    # Since DM functionality is now in a component within chat rooms,
+    # redirect to the main chat room where the DM component can be used
+    socket
+    |> push_navigate(to: ~p"/rooms/#{socket.assigns.room.id}")
+    |> noreply()
   end
 
   def handle_event("search", %{"query" => query}, socket) do

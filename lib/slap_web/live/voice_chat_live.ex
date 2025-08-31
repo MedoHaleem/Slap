@@ -198,7 +198,7 @@ defmodule SlapWeb.VoiceChatLive do
         <div class="max-w-md mx-auto px-4 flex justify-between items-center">
           <div class="flex items-center">
             <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
-            
+
             <div class="ml-3 text-sm text-gray-600">
               <%= if @call_status == "incoming" do %>
                 from {@caller.username}
@@ -207,7 +207,7 @@ defmodule SlapWeb.VoiceChatLive do
               <% end %>
             </div>
           </div>
-          
+
           <div class="flex items-center gap-4">
             <%= if @call_status in ["connected", "connecting"] do %>
               <button
@@ -217,7 +217,7 @@ defmodule SlapWeb.VoiceChatLive do
                 <.icon name="hero-phone-x-mark" class="h-5 w-5 mr-2" /> End Call
               </button>
             <% end %>
-            
+
             <button
               onclick="window.close()"
               class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
@@ -227,26 +227,26 @@ defmodule SlapWeb.VoiceChatLive do
           </div>
         </div>
       </div>
-      
+
       <div class="w-full flex items-center justify-center min-h-screen pt-20">
         <div class="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-auto">
           <div class="text-center">
             <div class={"call-status-badge mb-6 #{status_color(@call_status)}"}>
               {status_message(@call_status)}
             </div>
-            
+
             <div class="mb-8">
               <div class={"w-32 h-32 rounded-full flex items-center justify-center mx-auto #{status_bg_color(@call_status)}"}>
                 <.icon name="hero-microphone" class="h-16 w-16 text-gray-500" />
               </div>
-              
+
               <%= if @call_status == "connected" do %>
                 <div class="audio-wave mt-4">
                   <span></span> <span></span> <span></span> <span></span> <span></span>
                 </div>
               <% end %>
             </div>
-            
+
             <div
               id="voice-chat-container"
               phx-hook="VoiceChat"
@@ -273,7 +273,7 @@ defmodule SlapWeb.VoiceChatLive do
                       >
                         <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
                       </button>
-                      
+
                       <button
                         phx-click="reject_call"
                         class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full text-lg flex items-center"
@@ -301,7 +301,7 @@ defmodule SlapWeb.VoiceChatLive do
                     <div class="mb-4 text-red-600 text-sm">
                       {String.replace_prefix(@call_status, "error: ", "")}
                     </div>
-                    
+
                     <button
                       phx-click="request_call"
                       class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"

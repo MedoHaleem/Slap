@@ -62,6 +62,7 @@ defmodule SlapWeb.VoiceChatLiveTest do
 
       # Send signal event
       signal_data = %{"type" => "offer", "sdp" => "test_sdp"}
+
       view
       |> render_hook("signal", %{"signal" => signal_data})
 
@@ -70,5 +71,4 @@ defmodule SlapWeb.VoiceChatLiveTest do
       assert html =~ "Voice Chat"
     end
   end
-
 end

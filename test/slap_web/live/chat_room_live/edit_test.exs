@@ -55,7 +55,8 @@ defmodule SlapWeb.ChatRoomLive.EditTest do
 
       # Should show validation errors
       html = render(view)
-      assert html =~ "can't be blank" or html =~ "Name" # Check for error or field label
+      # Check for error or field label
+      assert html =~ "can't be blank" or html =~ "Name"
     end
 
     test "saves room changes", %{conn: conn, room: room, user: user} do
@@ -68,9 +69,10 @@ defmodule SlapWeb.ChatRoomLive.EditTest do
       new_topic = "Updated Room Topic"
 
       # Submit valid data
-      result = view
-               |> form("#room-form", %{room: %{name: new_name, topic: new_topic}})
-               |> render_submit()
+      result =
+        view
+        |> form("#room-form", %{room: %{name: new_name, topic: new_topic}})
+        |> render_submit()
 
       # Should redirect to room page
       assert result =~ "Room updated Successfully" or result =~ "redirect"
@@ -106,7 +108,8 @@ defmodule SlapWeb.ChatRoomLive.EditTest do
 
       # Should show validation error or at least not crash
       html = render(view)
-      assert html =~ "Edit chat room" # Page still renders
+      # Page still renders
+      assert html =~ "Edit chat room"
     end
 
     test "validates room name uniqueness", %{conn: conn, room: room, user: user} do
@@ -125,7 +128,8 @@ defmodule SlapWeb.ChatRoomLive.EditTest do
 
       # Should show uniqueness error or at least not crash
       html = render(view)
-      assert html =~ "Edit chat room" # Page still renders
+      # Page still renders
+      assert html =~ "Edit chat room"
     end
   end
 end

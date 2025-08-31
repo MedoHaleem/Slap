@@ -66,13 +66,26 @@ defmodule SlapWeb.ChatComponents do
       />
       <div class="ml-2">
         <div class="-mt-1">
-          <.link
-            phx-click="show-profile"
-            phx-value-user-id={@message.user.id}
-            class="text-sm font-semibold hover:underline"
-          >
-            <span>{@message.user.username}</span>
-          </.link>
+          <div class="group relative inline-flex items-center">
+            <.link
+              phx-click="show-profile"
+              phx-value-user-id={@message.user.id}
+              class="text-sm font-semibold hover:underline"
+            >
+              <span>{@message.user.username}</span>
+            </.link>
+            
+            <%= if @current_user.id != @message.user.id do %>
+              <button
+                phx-click="start-direct-message"
+                phx-value-user-id={@message.user.id}
+                class="ml-1 hidden group-hover:inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100"
+                title="Send direct message"
+              >
+                <.icon name="hero-chat-bubble-bottom-center-text" class="h-3 w-3" />
+              </button>
+            <% end %>
+          </div>
           
           <span :if={@timezone} class="ml-1 text-xs text-gray-500">
             {message_timestamp(@message, @timezone)}

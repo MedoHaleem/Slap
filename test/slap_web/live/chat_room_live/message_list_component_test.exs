@@ -65,7 +65,7 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponentTest do
       assert html =~ "message"
     end
 
-    test "handles empty message list", %{conn: conn, room: room, user: user} do
+    test "handles empty message list", %{conn: conn, room: _room, user: user} do
       # Create a room with no messages
       empty_room = room_fixture(%{name: "empty-room", topic: "Empty Room"})
       join_room(empty_room, user)
@@ -91,7 +91,12 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponentTest do
       assert html =~ other_message.body
     end
 
-    test "renders message with attachments", %{conn: conn, room: room, user: user, message1: message1} do
+    test "renders message with attachments", %{
+      conn: conn,
+      room: room,
+      user: _user,
+      message1: message1
+    } do
       # Add attachment to message1
       attachment = attachment_fixture(message1)
 
@@ -101,5 +106,4 @@ defmodule SlapWeb.ChatRoomLive.MessageListComponentTest do
       assert html =~ attachment.file_name
     end
   end
-
 end

@@ -119,6 +119,7 @@ defmodule SlapWeb.ErrorHTMLTest do
       case Code.fetch_docs(ErrorHTML) do
         {:docs_v1, _, _, _, %{"en" => docs}, _, _} ->
           assert docs != nil
+
         _ ->
           # If docs are not available, just check the module exists
           assert Code.ensure_loaded?(ErrorHTML)

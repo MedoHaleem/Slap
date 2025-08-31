@@ -32,7 +32,11 @@ defmodule SlapWeb.ChatRoomLive.IndexTest do
       assert has_element?(view, "#rooms")
     end
 
-    test "lists all rooms with joined status", %{conn: conn, room: room, another_room: another_room} do
+    test "lists all rooms with joined status", %{
+      conn: conn,
+      room: room,
+      another_room: another_room
+    } do
       {:ok, _view, html} = live(conn, ~p"/rooms")
 
       assert html =~ room.name
@@ -41,7 +45,11 @@ defmodule SlapWeb.ChatRoomLive.IndexTest do
       assert html =~ another_room.topic
     end
 
-    test "shows joined status for rooms the user has joined", %{conn: conn, room: room, user: user} do
+    test "shows joined status for rooms the user has joined", %{
+      conn: conn,
+      room: room,
+      user: user
+    } do
       # Join the room first
       join_room(room, user)
 
@@ -171,7 +179,8 @@ defmodule SlapWeb.ChatRoomLive.IndexTest do
       # but initially hidden
       html = render(view)
       assert html =~ "New chat room"
-      assert html =~ "hidden" # The modal should be hidden initially
+      # The modal should be hidden initially
+      assert html =~ "hidden"
     end
   end
 end

@@ -10,7 +10,7 @@ defmodule SlapWeb.UserSettingsLive do
         Account Settings
         <:subtitle>Manage your account email address and password settings</:subtitle>
       </.header>
-      
+
       <div class="space-y-12 divide-y">
         <div>
           <.simple_form
@@ -34,7 +34,7 @@ defmodule SlapWeb.UserSettingsLive do
             </:actions>
           </.simple_form>
         </div>
-        
+
         <div>
           <.simple_form
             for={@password_form}

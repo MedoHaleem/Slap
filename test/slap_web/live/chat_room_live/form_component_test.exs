@@ -3,7 +3,6 @@ defmodule SlapWeb.ChatRoomLive.FormComponentTest do
 
   import Phoenix.LiveViewTest
   import Slap.AccountsFixtures
-  import Slap.ChatFixtures
 
   setup %{conn: conn} do
     user = user_fixture(%{username: "TestUser"})
@@ -26,7 +25,11 @@ defmodule SlapWeb.ChatRoomLive.FormComponentTest do
       # This tests the business logic without relying on the modal UI
 
       # Test valid room creation
-      valid_attrs = %{name: "test-room-#{System.unique_integer([:positive])}", topic: "Test Topic"}
+      valid_attrs = %{
+        name: "test-room-#{System.unique_integer([:positive])}",
+        topic: "Test Topic"
+      }
+
       assert {:ok, _room} = Slap.Chat.create_room(valid_attrs)
 
       # Test invalid room creation (empty name)
@@ -35,7 +38,11 @@ defmodule SlapWeb.ChatRoomLive.FormComponentTest do
       assert %{name: ["can't be blank"]} = Slap.DataCase.errors_on(changeset)
 
       # Test duplicate name
-      duplicate_attrs = %{name: "test-room-#{System.unique_integer([:positive])}", topic: "Test Topic"}
+      duplicate_attrs = %{
+        name: "test-room-#{System.unique_integer([:positive])}",
+        topic: "Test Topic"
+      }
+
       assert {:ok, _room} = Slap.Chat.create_room(duplicate_attrs)
       assert {:error, changeset} = Slap.Chat.create_room(duplicate_attrs)
       assert %{name: ["has already been taken"]} = Slap.DataCase.errors_on(changeset)
@@ -78,7 +85,9 @@ defmodule SlapWeb.ChatRoomLive.FormComponentTest do
       attrs = %{name: invalid_name, topic: "Special Topic"}
 
       assert {:error, changeset} = Slap.Chat.create_room(attrs)
-      assert %{name: ["can only contain lowercase letters, numbers and dashes"]} = Slap.DataCase.errors_on(changeset)
+
+      assert %{name: ["can only contain lowercase letters, numbers and dashes"]} =
+               Slap.DataCase.errors_on(changeset)
 
       # Test valid name format
       valid_name = "test-room-#{System.unique_integer([:positive])}"
@@ -92,7 +101,9 @@ defmodule SlapWeb.ChatRoomLive.FormComponentTest do
       assert Code.ensure_loaded?(SlapWeb.ChatRoomLive.FormComponent)
       assert function_exported?(SlapWeb.ChatRoomLive.FormComponent, :render, 1)
       # Verify it's a LiveComponent by checking it uses Phoenix.LiveComponent
-      assert SlapWeb.ChatRoomLive.FormComponent.__info__(:attributes)[:behaviour] == [Phoenix.LiveComponent]
+      assert SlapWeb.ChatRoomLive.FormComponent.__info__(:attributes)[:behaviour] == [
+               Phoenix.LiveComponent
+             ]
     end
   end
 end

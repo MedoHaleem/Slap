@@ -15,6 +15,9 @@ defmodule Slap.Accounts.User do
 
     many_to_many :rooms, Room, join_through: RoomMembership
     has_many :reactions, Reaction
+    has_many :conversation_participants, Slap.Chat.ConversationParticipant
+    has_many :conversations, through: [:conversation_participants, :conversation]
+    has_many :direct_messages, Slap.Chat.DirectMessage
 
     timestamps(type: :utc_datetime)
   end

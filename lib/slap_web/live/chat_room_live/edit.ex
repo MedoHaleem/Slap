@@ -18,7 +18,7 @@ defmodule SlapWeb.ChatRoomLive.Edit do
           </.link>
         </:actions>
       </.header>
-       <.room_form form={@form} />
+      <.room_form form={@form} />
     </div>
     """
   end

@@ -48,7 +48,7 @@ defmodule SlapWeb.MessageSearchLiveTest do
   end
 
   describe "Search functionality" do
-    test "performs search and displays results", %{conn: conn, room: room, message1: message1} do
+    test "performs search and displays results", %{conn: conn, room: room, message1: _message1} do
       {:ok, view, _html} = live(conn, ~p"/search/#{room}")
 
       # Perform search
@@ -59,7 +59,8 @@ defmodule SlapWeb.MessageSearchLiveTest do
       # Check results are displayed
       html = render(view)
       assert html =~ "Search Results"
-      assert html =~ "results" # Check that results count is shown
+      # Check that results count is shown
+      assert html =~ "results"
       # Check that at least one message is displayed
       assert html =~ "Hello world" or html =~ "Another message" or html =~ "This message contains"
     end
@@ -177,7 +178,7 @@ defmodule SlapWeb.MessageSearchLiveTest do
   end
 
   describe "Message display" do
-    test "shows message metadata", %{conn: conn, room: room, message1: message1, user: user} do
+    test "shows message metadata", %{conn: conn, room: room, message1: _message1, user: user} do
       {:ok, view, _html} = live(conn, ~p"/search/#{room}")
 
       # Search for content

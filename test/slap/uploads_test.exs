@@ -8,6 +8,7 @@ defmodule Slap.UploadsTest do
     on_exit(fn ->
       # Clean up test upload directory
       upload_dir = "priv/static/uploads"
+
       if File.exists?(upload_dir) do
         File.rm_rf!(upload_dir)
       end
@@ -87,6 +88,7 @@ defmodule Slap.UploadsTest do
     test "creates upload directory if it doesn't exist" do
       # Remove upload directory if it exists
       upload_dir = "priv/static/uploads"
+
       if File.exists?(upload_dir) do
         File.rm_rf!(upload_dir)
       end
