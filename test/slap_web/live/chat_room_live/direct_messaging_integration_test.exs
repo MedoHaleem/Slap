@@ -36,7 +36,7 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
   describe "Opening DM Panel from ChatRoomLive" do
     test "opens DM panel when clicking start-direct-message event", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
       room: room
     } do
@@ -264,7 +264,7 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
 
     test "handles message deletions while in chat room", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
       message: message,
       room: room
@@ -278,8 +278,14 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
       )
       |> render_click()
 
+      # Verify the message is initially present
+      assert render(view) =~ message.body
+
       # Manually simulate the direct_message_deleted event
       send(view.pid, {:direct_message_deleted, message})
+
+      # Give the event time to be processed
+      :timer.sleep(100)
 
       # Verify that message deletions are handled while in chat room
       refute render(view) =~ message.body
@@ -287,7 +293,7 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
 
     test "updates conversation read status in real-time", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
       room: room
     } do
@@ -313,7 +319,7 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
   describe "Multiple DM Interactions within Chat Room" do
     test "allows opening multiple DM conversations in sequence", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
       room: room
     } do
@@ -632,9 +638,9 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
 
     test "loads messages for existing conversation", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
-      conversation: conversation,
+      conversation: _conversation,
       message: message,
       room: room
     } do
@@ -653,7 +659,7 @@ defmodule SlapWeb.ChatRoomLive.DirectMessagingIntegrationTest do
 
     test "creates new conversation when none exists", %{
       conn: conn,
-      user: user,
+      user: _user,
       other_user: other_user,
       room: room
     } do

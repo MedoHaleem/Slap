@@ -20,7 +20,7 @@ defmodule SlapWeb.MessageSearchLive do
     ~H"""
     <div class="p-4">
       <h1 class="text-xl font-bold mb-4">Search Messages in {@room.name}</h1>
-
+      
       <form phx-change="search" phx-submit="search" class="mb-6">
         <div class="flex gap-2">
           <input
@@ -39,7 +39,7 @@ defmodule SlapWeb.MessageSearchLive do
           </button>
         </div>
       </form>
-
+      
       <%= if @search_query do %>
         <div class="mb-4">
           <div class="flex justify-between items-center mb-2">
@@ -49,7 +49,7 @@ defmodule SlapWeb.MessageSearchLive do
                 <span class="text-sm font-normal text-gray-500">({@search_count} results)</span>
               <% end %>
             </h2>
-
+            
             <%= if @search_count > @per_page do %>
               <div class="flex gap-2">
                 <%= if @page > 1 do %>
@@ -60,11 +60,11 @@ defmodule SlapWeb.MessageSearchLive do
                     Previous
                   </button>
                 <% end %>
-
+                
                 <span class="px-3 py-1 text-sm text-gray-600">
                   Page {@page}
                 </span>
-
+                
                 <%= if length(@search_results) == @per_page do %>
                   <button
                     phx-click="next_page"
@@ -76,7 +76,7 @@ defmodule SlapWeb.MessageSearchLive do
               </div>
             <% end %>
           </div>
-
+          
           <%= if @search_count == 0 do %>
             <div class="text-center py-8 text-gray-500">
               <p>No messages found matching "{@search_query}"</p>
@@ -100,18 +100,18 @@ defmodule SlapWeb.MessageSearchLive do
                           </button>
                         <% end %>
                       </div>
-
+                      
                       <%= if Map.get(message, :type) == :reply do %>
                         <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
                           In Thread
                         </span>
                       <% end %>
-
+                      
                       <span class="text-gray-500 text-sm ml-3">
                         {Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M")}
                       </span>
                     </div>
-
+                    
                     <.link
                       navigate={
                         if Map.get(message, :type) == :reply,
@@ -124,7 +124,7 @@ defmodule SlapWeb.MessageSearchLive do
                       View in context
                     </.link>
                   </div>
-
+                  
                   <div class="text-gray-700 leading-relaxed">
                     {raw(highlight_search_terms(message.body, @search_query))}
                     <%= if Map.get(message, :type) == :reply do %>
@@ -147,7 +147,7 @@ defmodule SlapWeb.MessageSearchLive do
     """
   end
 
-  def handle_event("start-direct-message", %{"user-id" => user_id}, socket) do
+  def handle_event("start-direct-message", %{"user-id" => _user_id}, socket) do
     # Since DM functionality is now in a component within chat rooms,
     # redirect to the main chat room where the DM component can be used
     socket

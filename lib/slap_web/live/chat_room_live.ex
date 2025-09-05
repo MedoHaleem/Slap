@@ -26,50 +26,32 @@ defmodule SlapWeb.ChatRoomLive do
     timezone = get_connect_params(socket)["timezone"]
     current_user = socket.assigns.current_user
 
-    # Initialize DM state
-    dm_state =
-      if connected?(socket) do
-        OnlineUsers.track(self(), current_user)
-        # Subscribe to voice call requests
-        SlapWeb.Endpoint.subscribe("voice:#{current_user.id}")
-        # Subscribe to direct messaging events
-        SlapWeb.Endpoint.subscribe("direct_messages:#{current_user.id}")
-        # Load DM conversations
-        dm_conversations = Slap.DirectMessaging.get_user_conversations(current_user)
-        dm_unread_count = Slap.DirectMessaging.get_unread_conversation_count(current_user)
-
-        %{
-          dm_conversations: dm_conversations,
-          dm_unread_count: dm_unread_count
-        }
-      else
-        %{
-          dm_conversations: [],
-          dm_unread_count: 0
-        }
-      end
-
     OnlineUsers.subscribe()
     Accounts.subscribe_to_user_avatars()
 
     Enum.each(rooms, fn {chat, _} -> Chat.subscribe_to_room(chat) end)
 
+    # Track user for online presence and voice calls
+    dm_unread_count =
+      if connected?(socket) do
+        OnlineUsers.track(self(), current_user)
+        # Subscribe to voice call requests
+        SlapWeb.Endpoint.subscribe("voice:#{current_user.id}")
+        # Initialize dm_unread_count
+        Slap.DirectMessaging.get_unread_conversation_count(current_user)
+      else
+        0
+      end
+
     socket
     |> assign(rooms: rooms, timezone: timezone, users: users)
     |> assign(online_users: OnlineUsers.list())
     |> assign(incoming_call: nil)
+    |> assign(dm_unread_count: dm_unread_count)
     # Initialize search_query
     |> assign(search_query: nil)
     # Initialize DM state
-    |> assign(
-      show_dm: false,
-      dm_conversations: dm_state.dm_conversations,
-      dm_selected_conversation: nil,
-      dm_messages: [],
-      dm_unread_count: dm_state.dm_unread_count,
-      dm_loading: false,
-      dm_message_form: to_form(%{"body" => ""})
-    )
+    |> assign(show_dm: false)
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
@@ -92,6 +74,7 @@ defmodule SlapWeb.ChatRoomLive do
       current_room_id={@room.id}
       current_room={@room}
       current_user={@current_user}
+      dm_unread_count={@dm_unread_count}
     />
     <div class="flex flex-col grow shadow-lg">
       <.live_component
@@ -289,12 +272,7 @@ defmodule SlapWeb.ChatRoomLive do
         id="direct-messaging"
         module={SlapWeb.DirectMessagingComponent}
         current_user={@current_user}
-        conversations={@dm_conversations}
-        selected_conversation={@dm_selected_conversation}
-        messages={@dm_messages}
-        unread_count={@dm_unread_count}
-        loading={@dm_loading}
-        message_form={@dm_message_form}
+        target_user={@dm_target_user}
       />
     <% end %>
     """
@@ -315,17 +293,8 @@ defmodule SlapWeb.ChatRoomLive do
 
     Chat.update_last_read_id(room, socket.assigns.current_user)
 
-    # Handle thread context from search results
-    thread_message_id = Map.get(params, "thread")
-    highlight_message_id = Map.get(params, "highlight")
-
-    # Clear search results when navigating to highlight a message
-    socket =
-      if highlight_message_id || thread_message_id do
-        assign(socket, search_results: [], search_query: nil, search_count: 0)
-      else
-        socket
-      end
+    # Handle thread and highlight parameters
+    {socket, thread_message_id, highlight_message_id} = handle_navigation_params(socket, params)
 
     socket
     |> assign(
@@ -534,56 +503,24 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_event("start-direct-message", %{"user-id" => user_id}, socket) do
-    current_user = socket.assigns.current_user
+    _current_user = socket.assigns.current_user
 
     try do
-      target_user = Accounts.get_user!(user_id)
+      # Validate that user_id is a valid integer
+      target_user =
+        case Integer.parse(user_id) do
+          {parsed_user_id, ""} ->
+            Accounts.get_user!(parsed_user_id)
 
-      conversation =
-        Slap.DirectMessaging.get_conversation_between_users(current_user.id, target_user.id)
-
-      if conversation do
-        # Show existing conversation in DM panel
-        Slap.DirectMessaging.subscribe_to_conversation(conversation)
-        Slap.DirectMessaging.mark_conversation_read(conversation, current_user)
-
-        messages = Slap.DirectMessaging.list_direct_messages(conversation.id)
-
-        socket
-        |> assign(show_dm: true)
-        |> assign(dm_selected_conversation: conversation)
-        |> assign(dm_messages: messages)
-        |> assign(
-          dm_unread_count: Slap.DirectMessaging.get_unread_conversation_count(current_user)
-        )
-        |> noreply()
-      else
-        # Create new conversation and show it in DM panel
-        case Slap.DirectMessaging.create_conversation_with_participants(
-               %{title: "Direct Message"},
-               [current_user.id, target_user.id]
-             ) do
-          {:ok, conversation} ->
-            Slap.DirectMessaging.subscribe_to_conversation(conversation)
-
-            socket
-            |> assign(show_dm: true)
-            |> assign(dm_selected_conversation: conversation)
-            |> assign(dm_messages: [])
-            |> assign(
-              dm_unread_count: Slap.DirectMessaging.get_unread_conversation_count(current_user)
-            )
-            |> noreply()
-
-          {:error, changeset} ->
-            # Log the detailed error for debugging
-            IO.inspect(changeset, label: "Conversation creation error")
-
-            socket
-            |> put_flash(:error, "Failed to start conversation: #{inspect(changeset.errors)}")
-            |> noreply()
+          _ ->
+            raise Ecto.NoResultsError, queryable: Slap.Accounts.User
         end
-      end
+
+      # Show the DM panel which will handle conversation creation and selection
+      socket
+      |> assign(show_dm: true)
+      |> assign(dm_target_user: target_user)
+      |> noreply()
     rescue
       Ecto.NoResultsError ->
         socket
@@ -608,10 +545,6 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("close-profile", _, socket) do
     assign(socket, :profile, nil) |> noreply()
-  end
-
-  def handle_event("close_dm_panel", _, socket) do
-    assign(socket, show_dm: false) |> noreply()
   end
 
   def handle_event("join-room", _, socket) do
@@ -760,67 +693,32 @@ defmodule SlapWeb.ChatRoomLive do
     |> noreply()
   end
 
-  def handle_info({:new_direct_message, message}, socket) do
-    current_user = socket.assigns.current_user
-    dm_selected_conversation = socket.assigns.dm_selected_conversation
-
-    if dm_selected_conversation && dm_selected_conversation.id == message.conversation_id do
-      # Only add the message if it wasn't sent by the current user
-      # Messages from current user are already added optimistically when sending
-      if message.user_id != current_user.id do
-        dm_messages = [message | socket.assigns.dm_messages]
-
-        socket =
-          socket
-          |> assign(dm_messages: dm_messages)
-          |> then(fn s ->
-            # Mark conversation as read but don't use the return value
-            Slap.DirectMessaging.mark_conversation_read(dm_selected_conversation, current_user)
-            s
-          end)
-
-        {:noreply, socket}
-      else
-        # For messages sent by current user, just mark as read
-        Slap.DirectMessaging.mark_conversation_read(dm_selected_conversation, current_user)
-        {:noreply, socket}
-      end
-    else
-      # Update unread count if message is for a different conversation
-      dm_unread_count = Slap.DirectMessaging.get_unread_conversation_count(current_user)
-      {:noreply, assign(socket, dm_unread_count: dm_unread_count)}
-    end
-  end
-
-  def handle_info({:direct_message_deleted, message}, socket) do
-    dm_selected_conversation = socket.assigns.dm_selected_conversation
-
-    if dm_selected_conversation && dm_selected_conversation.id == message.conversation_id do
-      dm_messages = Enum.reject(socket.assigns.dm_messages, &(&1.id == message.id))
-      {:noreply, assign(socket, dm_messages: dm_messages)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info({:conversation_read, user_id, _timestamp}, socket) do
-    current_user = socket.assigns.current_user
-
-    if user_id != current_user.id do
-      # Update unread count when other participants read messages
-      dm_unread_count = Slap.DirectMessaging.get_unread_conversation_count(current_user)
-      {:noreply, assign(socket, dm_unread_count: dm_unread_count)}
-    else
-      {:noreply, socket}
-    end
+  def handle_info({:update_dm_unread_count, dm_unread_count}, socket) do
+    assign(socket, dm_unread_count: dm_unread_count) |> noreply()
   end
 
   def handle_info(:close_dm_panel, socket) do
-    {:noreply, assign(socket, show_dm: false)}
+    assign(socket, show_dm: false) |> noreply()
   end
 
-  def handle_info(_msg, socket) do
-    socket |> noreply()
+  def handle_info({:direct_message_deleted, message}, socket) do
+    # Forward the direct_message_deleted event to the DirectMessagingComponent
+    if socket.assigns[:show_dm] do
+      # Send the message directly to the DirectMessagingComponent
+      send_update(SlapWeb.DirectMessagingComponent,
+        id: "direct-messaging",
+        direct_message_deleted: message
+      )
+    end
+
+    {:noreply, socket}
+  end
+
+  # Add a catch-all handle_info to log any unhandled messages
+  def handle_info(msg, socket) do
+    require Logger
+    Logger.debug("ChatRoomLive received unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   defp highlight_message(socket, message) do
@@ -936,5 +834,21 @@ defmodule SlapWeb.ChatRoomLive do
 
   defp highlight_match(match) do
     "<mark class=\"bg-yellow-200 text-yellow-800 px-1 rounded\">#{match}</mark>"
+  end
+
+  defp handle_navigation_params(socket, params) do
+    # Handle thread context from search results
+    thread_message_id = Map.get(params, "thread")
+    highlight_message_id = Map.get(params, "highlight")
+
+    # Clear search results when navigating to highlight a message
+    socket =
+      if highlight_message_id || thread_message_id do
+        assign(socket, search_results: [], search_query: nil, search_count: 0)
+      else
+        socket
+      end
+
+    {socket, thread_message_id, highlight_message_id}
   end
 end

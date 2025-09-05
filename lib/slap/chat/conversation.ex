@@ -7,6 +7,7 @@ defmodule Slap.Chat.Conversation do
   schema "conversations" do
     field :title, :string
     field :last_message_at, :utc_datetime
+    field :participant_count, :integer, default: 0
 
     has_many :conversation_participants, ConversationParticipant
     has_many :direct_messages, DirectMessage

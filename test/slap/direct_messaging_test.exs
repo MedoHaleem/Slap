@@ -77,8 +77,13 @@ defmodule Slap.DirectMessagingTest do
 
       conversation = conversation_with_participants_fixture(user1, user2)
 
-      assert DirectMessaging.get_conversation_between_users(user1.id, user2.id) == conversation
-      assert DirectMessaging.get_conversation_between_users(user2.id, user1.id) == conversation
+      result = DirectMessaging.get_conversation_between_users(user1.id, user2.id)
+      assert result.id == conversation.id
+      assert result.title == conversation.title
+      assert result.participant_count == 2
+
+      result2 = DirectMessaging.get_conversation_between_users(user2.id, user1.id)
+      assert result2.id == conversation.id
       refute DirectMessaging.get_conversation_between_users(user1.id, user3.id)
     end
 
@@ -148,7 +153,7 @@ defmodule Slap.DirectMessagingTest do
       message1 = direct_message_fixture(conversation, user1)
       message2 = direct_message_fixture(conversation, user2)
 
-      messages = DirectMessaging.list_direct_messages(conversation.id)
+      messages = DirectMessaging.list_direct_messages(conversation.id, current_user_id: user1.id)
 
       assert length(messages) == 2
       message_ids = Enum.map(messages, & &1.id)
@@ -163,7 +168,7 @@ defmodule Slap.DirectMessagingTest do
       :timer.sleep(10)
       message2 = direct_message_fixture(conversation, user2)
 
-      messages = DirectMessaging.list_direct_messages(conversation.id)
+      messages = DirectMessaging.list_direct_messages(conversation.id, current_user_id: user1.id)
 
       # Messages should be in chronological order (oldest first)
       [first, second] = messages
@@ -174,16 +179,18 @@ defmodule Slap.DirectMessagingTest do
     test "get_direct_message!/1 returns the direct message with given id",
          %{conversation: conversation, user1: user} do
       direct_message = direct_message_fixture(conversation, user)
-      assert DirectMessaging.get_direct_message!(direct_message.id) == direct_message
+
+      assert DirectMessaging.get_direct_message!(direct_message.id, current_user_id: user.id) ==
+               direct_message
     end
 
-    test "update_direct_message/2 updates the direct message",
+    test "update_direct_message/3 updates the direct message",
          %{conversation: conversation, user1: user} do
       direct_message = direct_message_fixture(conversation, user)
       new_body = "Updated message body"
 
       assert {:ok, %DirectMessage{} = updated_message} =
-               DirectMessaging.update_direct_message(direct_message, %{body: new_body})
+               DirectMessaging.update_direct_message(direct_message, %{body: new_body}, user)
 
       assert updated_message.body == new_body
     end
@@ -206,7 +213,10 @@ defmodule Slap.DirectMessagingTest do
       direct_message_fixture(conversation, user2, %{body: "Good morning"})
       direct_message_fixture(conversation, user1, %{body: "Hello there"})
 
-      results = DirectMessaging.search_direct_messages(conversation.id, "Hello")
+      results =
+        DirectMessaging.search_direct_messages(conversation.id, "Hello",
+          current_user_id: user1.id
+        )
 
       assert length(results) == 2
       assert Enum.all?(results, fn msg -> String.contains?(msg.body, "Hello") end)
@@ -216,10 +226,18 @@ defmodule Slap.DirectMessagingTest do
          %{conversation: conversation, user1: user} do
       direct_message_fixture(conversation, user, %{body: "Hello WORLD"})
 
-      results = DirectMessaging.search_direct_messages(conversation.id, "hello world")
+      results =
+        DirectMessaging.search_direct_messages(conversation.id, "hello world",
+          current_user_id: user.id
+        )
+
       assert length(results) == 1
 
-      results = DirectMessaging.search_direct_messages(conversation.id, "HELLO WORLD")
+      results =
+        DirectMessaging.search_direct_messages(conversation.id, "HELLO WORLD",
+          current_user_id: user.id
+        )
+
       assert length(results) == 1
     end
   end
@@ -354,17 +372,20 @@ defmodule Slap.DirectMessagingTest do
 
       {:ok, direct_message} = DirectMessaging.send_direct_message(conversation, attrs, user)
 
-      # Check if the message was broadcast
-      assert_receive {:new_direct_message, ^direct_message}
+      # Check if the message was broadcast (ignoring broadcast_at metadata)
+      assert_receive {:new_direct_message, broadcast_message}
+      assert broadcast_message.id == direct_message.id
+      assert broadcast_message.body == direct_message.body
+      assert broadcast_message.user_id == direct_message.user_id
     end
 
-    test "update_direct_message/2 broadcasts updated message",
+    test "update_direct_message/3 broadcasts updated message",
          %{conversation: conversation, user1: user} do
       direct_message = direct_message_fixture(conversation, user)
       new_body = "Updated message"
 
       {:ok, updated_message} =
-        DirectMessaging.update_direct_message(direct_message, %{body: new_body})
+        DirectMessaging.update_direct_message(direct_message, %{body: new_body}, user)
 
       # Check if the update was broadcast
       assert_receive {:updated_direct_message, ^updated_message}
@@ -385,8 +406,10 @@ defmodule Slap.DirectMessagingTest do
     test "create_conversation_with_participants/2 with empty participant list returns error" do
       attrs = valid_conversation_attributes()
 
-      assert {:error, %Ecto.Changeset{}} =
+      assert {:error, %Ecto.Changeset{errors: errors}} =
                DirectMessaging.create_conversation_with_participants(attrs, [])
+
+      assert {:participants, {"must have at least 2 participants", []}} in errors
     end
 
     test "create_conversation_with_participants/2 with non-existent user returns error" do
@@ -423,7 +446,9 @@ defmodule Slap.DirectMessagingTest do
       direct_message_fixture(conversation, user1, %{body: "Hello world"})
       direct_message_fixture(conversation, user2, %{body: "Good morning"})
 
-      results = DirectMessaging.search_direct_messages(conversation.id, "")
+      results =
+        DirectMessaging.search_direct_messages(conversation.id, "", current_user_id: user1.id)
+
       assert length(results) == 2
     end
 
@@ -436,7 +461,11 @@ defmodule Slap.DirectMessagingTest do
       direct_message_fixture(conversation, user1, %{body: "Special chars: &@#$%"})
 
       # Search with special characters
-      results = DirectMessaging.search_direct_messages(conversation.id, "&@#$%")
+      results =
+        DirectMessaging.search_direct_messages(conversation.id, "&@#$%",
+          current_user_id: user1.id
+        )
+
       assert length(results) == 1
     end
   end

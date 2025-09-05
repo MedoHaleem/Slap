@@ -4,7 +4,34 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
   alias Slap.Chat.Room
   alias Slap.Accounts.User
   alias SlapWeb.OnlineUsers
+  alias Slap.DirectMessaging
 
+  @impl true
+  def update(assigns, socket) do
+    # Assign all passed assigns first, excluding reserved assigns
+    assigns = Map.drop(assigns, [:myself])
+    socket = assign(socket, assigns)
+
+    # Initialize unread count only if not already present and connected
+    socket =
+      if socket.assigns[:dm_unread_count] == nil && Phoenix.LiveView.connected?(socket) do
+        # Subscribe to direct messages for real-time updates
+        SlapWeb.Endpoint.subscribe("direct_messages:#{socket.assigns.current_user.id}")
+
+        # Get unread conversation count
+        dm_unread_count =
+          DirectMessaging.get_unread_conversation_count(socket.assigns.current_user)
+
+        socket
+        |> assign(dm_unread_count: dm_unread_count)
+      else
+        socket
+      end
+
+    {:ok, socket}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="flex flex-col shrink-0 w-64 bg-slate-100">
@@ -69,6 +96,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
           <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
+              <.unread_message_counter count={@dm_unread_count || 0} />
             </div>
           </div>
           
@@ -200,5 +228,43 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
       {@count}
     </span>
     """
+  end
+
+  def handle_info({:new_direct_message, message}, socket) do
+    current_user = socket.assigns.current_user
+
+    # Only update unread count if message wasn't sent by current user
+    if message.user_id != current_user.id do
+      update_unread_count(socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:conversation_read, user_id, _timestamp}, socket) do
+    current_user = socket.assigns.current_user
+
+    if user_id != current_user.id do
+      # Update unread count when other participants read messages
+      update_unread_count(socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:conversation_deleted, _conversation_id}, socket) do
+    update_unread_count(socket)
+  end
+
+  defp update_unread_count(socket) do
+    current_user = socket.assigns.current_user
+
+    # Get updated unread count
+    dm_unread_count = DirectMessaging.get_unread_conversation_count(current_user)
+
+    # Send update to parent live view
+    send(self(), {:update_dm_unread_count, dm_unread_count})
+
+    {:noreply, assign(socket, dm_unread_count: dm_unread_count)}
   end
 end

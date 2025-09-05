@@ -9,15 +9,132 @@ defmodule SlapWeb.DirectMessagingComponent do
     assigns = Map.drop(assigns, [:myself])
     socket = assign(socket, assigns)
 
-    # Initialize conversations only if not already present and connected
+    # Handle direct_message_deleted event
     socket =
-      if socket.assigns[:conversations] == nil && Phoenix.LiveView.connected?(socket) do
-        conversations = DirectMessaging.get_user_conversations(socket.assigns.current_user)
-        unread_count = DirectMessaging.get_unread_conversation_count(socket.assigns.current_user)
+      if Phoenix.LiveView.connected?(socket) and Map.has_key?(assigns, :direct_message_deleted) do
+        message = assigns.direct_message_deleted
 
-        socket
-        |> assign(conversations: conversations, unread_count: unread_count)
+        conversation = socket.assigns.selected_conversation
+
+        if conversation && conversation.id == message.conversation_id do
+          messages =
+            Enum.reject(socket.assigns.messages, fn msg ->
+              msg.id == message.id
+            end)
+
+          # Force a re-render by updating the messages assign
+          assign(socket, messages: messages)
+        else
+          # If the message is not in the selected conversation, we still need to refresh the conversation list
+          refresh_conversations(socket)
+        end
       else
+        socket
+      end
+
+    # Initialize required assigns only if not already present and connected
+    socket =
+      if Phoenix.LiveView.connected?(socket) do
+        socket =
+          if socket.assigns[:conversations] == nil do
+            conversations =
+              DirectMessaging.get_user_conversations_with_unread_counts(
+                socket.assigns.current_user
+              )
+
+            assign(socket, conversations: conversations)
+          else
+            socket
+          end
+
+        # Initialize selected_conversation if not present
+        socket =
+          if socket.assigns[:selected_conversation] == nil do
+            assign(socket, selected_conversation: nil)
+          else
+            socket
+          end
+
+        # Initialize messages if not present
+        socket =
+          if socket.assigns[:messages] == nil do
+            assign(socket, messages: [])
+          else
+            socket
+          end
+
+        # Initialize message form
+        socket =
+          if socket.assigns[:message_form] == nil do
+            assign(socket, message_form: to_form(%{"body" => ""}))
+          else
+            socket
+          end
+
+        # If we have a target user and no selected conversation, try to find or create a conversation
+        socket =
+          if socket.assigns[:target_user] && socket.assigns.selected_conversation == nil do
+            current_user = socket.assigns.current_user
+            target_user = socket.assigns.target_user
+
+            case DirectMessaging.get_conversation_between_users(current_user.id, target_user.id) do
+              nil ->
+                # No conversation exists, create a new one
+                case DirectMessaging.create_conversation(%{},
+                       participants: [current_user, target_user]
+                     ) do
+                  {:ok, conversation} ->
+                    DirectMessaging.subscribe_to_conversation(conversation)
+                    DirectMessaging.mark_conversation_read(conversation, current_user)
+
+                    messages =
+                      DirectMessaging.list_direct_messages(conversation.id,
+                        current_user_id: current_user.id
+                      )
+
+                    socket
+                    |> assign(selected_conversation: conversation, messages: messages)
+                    |> refresh_conversations()
+
+                  {:error, _} ->
+                    socket
+                end
+
+              conversation ->
+                # Conversation exists, use it
+                DirectMessaging.subscribe_to_conversation(conversation)
+                DirectMessaging.mark_conversation_read(conversation, current_user)
+
+                messages =
+                  DirectMessaging.list_direct_messages(conversation.id,
+                    current_user_id: current_user.id
+                  )
+
+                socket
+                |> assign(selected_conversation: conversation, messages: messages)
+                |> refresh_conversations()
+            end
+          else
+            socket
+          end
+
+        schedule_heartbeat(socket)
+      else
+        # Initialize default values when not connected
+        socket =
+          if socket.assigns[:selected_conversation] == nil do
+            assign(socket, selected_conversation: nil)
+          else
+            socket
+          end
+
+        socket =
+          if socket.assigns[:messages] == nil do
+            assign(socket, messages: [])
+          else
+            socket
+          end
+
         socket
       end
 
@@ -33,15 +150,13 @@ defmodule SlapWeb.DirectMessagingComponent do
         DirectMessaging.subscribe_to_conversation(conversation)
         DirectMessaging.mark_conversation_read(conversation, current_user)
 
-        messages = DirectMessaging.list_direct_messages(conversation.id)
+        messages =
+          DirectMessaging.list_direct_messages(conversation.id, current_user_id: current_user.id)
 
         socket =
           socket
-          |> assign(
-            selected_conversation: conversation,
-            messages: messages,
-            unread_count: DirectMessaging.get_unread_conversation_count(current_user)
-          )
+          |> assign(selected_conversation: conversation, messages: messages)
+          |> refresh_conversations()
 
         {:noreply, socket}
 
@@ -75,6 +190,23 @@ defmodule SlapWeb.DirectMessagingComponent do
     {:noreply, socket}
   end
 
+  def handle_event("reconnect", %{"last_message_id" => last_id}, socket) do
+    conversation = socket.assigns.selected_conversation
+    current_user = socket.assigns.current_user
+
+    if conversation do
+      # Fetch missed messages since last_id
+      missed_messages =
+        DirectMessaging.get_messages_since(conversation.id, last_id,
+          current_user_id: current_user.id
+        )
+
+      {:noreply, assign(socket, :missed_messages, missed_messages)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info({:new_direct_message, message}, socket) do
     current_user = socket.assigns.current_user
     conversation = socket.assigns.selected_conversation
@@ -101,9 +233,8 @@ defmodule SlapWeb.DirectMessagingComponent do
         {:noreply, socket}
       end
     else
-      # Update unread count if message is for a different conversation
-      unread_count = DirectMessaging.get_unread_conversation_count(current_user)
-      {:noreply, assign(socket, unread_count: unread_count)}
+      # Update conversations with new unread counts
+      {:noreply, refresh_conversations(socket)}
     end
   end
 
@@ -111,10 +242,16 @@ defmodule SlapWeb.DirectMessagingComponent do
     conversation = socket.assigns.selected_conversation
 
     if conversation && conversation.id == message.conversation_id do
-      messages = Enum.reject(socket.assigns.messages, &(&1.id == message.id))
+      messages =
+        Enum.reject(socket.assigns.messages, fn msg ->
+          msg.id == message.id
+        end)
+
+      # Force a re-render by updating the messages assign
       {:noreply, assign(socket, messages: messages)}
     else
-      {:noreply, socket}
+      # If the message is not in the selected conversation, we still need to refresh the conversation list
+      {:noreply, refresh_conversations(socket)}
     end
   end
 
@@ -122,12 +259,43 @@ defmodule SlapWeb.DirectMessagingComponent do
     current_user = socket.assigns.current_user
 
     if user_id != current_user.id do
-      # Update unread count when other participants read messages
-      unread_count = DirectMessaging.get_unread_conversation_count(current_user)
-      {:noreply, assign(socket, unread_count: unread_count)}
+      # Update conversations with refreshed unread counts when other participants read messages
+      {:noreply, refresh_conversations(socket)}
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info({:conversation_deleted, conversation_id}, socket) do
+    selected_conversation = socket.assigns.selected_conversation
+
+    socket =
+      if selected_conversation && selected_conversation.id == conversation_id do
+        # If the deleted conversation is currently selected, clear the selection
+        assign(socket, selected_conversation: nil, messages: [])
+      else
+        socket
+      end
+
+    # Remove the deleted conversation from the list and refresh
+    {:noreply, refresh_conversations(socket)}
+  end
+
+  def handle_info(:heartbeat, socket) do
+    # Send heartbeat to client and schedule next heartbeat
+    socket = schedule_heartbeat(socket)
+    {:noreply, push_event(socket, "heartbeat", %{timestamp: DateTime.utc_now()})}
+  end
+
+  def handle_info(:close_dm_panel, socket) do
+    send(self(), :close_dm_panel)
+    {:noreply, socket}
+  end
+
+  defp schedule_heartbeat(socket) do
+    # Send heartbeat every 30 seconds
+    Process.send_after(self(), :heartbeat, 30_000)
+    socket
   end
 
   @impl true
@@ -149,6 +317,7 @@ defmodule SlapWeb.DirectMessagingComponent do
             <!-- Header -->
             <div class="flex items-center justify-between px-4 py-5 sm:px-6 border-b border-gray-200">
               <h2 class="text-lg font-medium text-gray-900">Direct Messages</h2>
+
               <button
                 type="button"
                 class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -173,6 +342,7 @@ defmodule SlapWeb.DirectMessagingComponent do
                   <h3 class="text-md font-semibold text-gray-900">
                     {conversation_title(@selected_conversation, @current_user)}
                   </h3>
+
                   <p class="text-xs text-gray-600">
                     {length(@selected_conversation.conversation_participants)} participants
                   </p>
@@ -195,10 +365,12 @@ defmodule SlapWeb.DirectMessagingComponent do
                           <span class="text-sm font-medium text-gray-900">
                             {message.user.username}
                           </span>
+
                           <span class="text-xs text-gray-500">
-                            {Timex.format!(message.inserted_at, "{h12}:{m} {AM}")}
+                            {Timex.format!(message.inserted_at, "%I:%M %p", :strftime)}
                           </span>
                         </div>
+
                         <p class="text-gray-900 mt-1">
                           {message.body}
                         </p>
@@ -232,12 +404,6 @@ defmodule SlapWeb.DirectMessagingComponent do
               <% else %>
                 <!-- Conversation list -->
                 <div class="dm-messages-container flex-1 overflow-y-auto">
-                  <div class="p-4 border-b border-gray-200">
-                    <p class="text-sm text-gray-600">
-                      {@unread_count} unread conversation{if @unread_count != 1, do: "s"}
-                    </p>
-                  </div>
-
                   <%= for conversation <- @conversations do %>
                     <button
                       phx-click="select_conversation"
@@ -250,6 +416,7 @@ defmodule SlapWeb.DirectMessagingComponent do
                           <p class="text-sm font-medium text-gray-900 truncate">
                             {conversation_title(conversation, @current_user)}
                           </p>
+
                           <p class="text-xs text-gray-500 truncate">
                             <%= if conversation.last_message_at do %>
                               {Timex.format!(conversation.last_message_at, "{relative}", :relative)}
@@ -258,6 +425,7 @@ defmodule SlapWeb.DirectMessagingComponent do
                             <% end %>
                           </p>
                         </div>
+
                         <%= if get_unread_count(conversation, @current_user) > 0 do %>
                           <span class="ml-2 flex-shrink-0 bg-red-500 text-white text-xs font-medium
                                       px-2 py-1 rounded-full">
@@ -283,7 +451,9 @@ defmodule SlapWeb.DirectMessagingComponent do
                           />
                         </svg>
                       </div>
+
                       <h3 class="mt-2 text-sm font-medium text-gray-900">No conversations yet</h3>
+
                       <p class="mt-1 text-sm text-gray-500">
                         Start a new conversation by clicking the DM icon next to a user's name
                       </p>
@@ -307,6 +477,13 @@ defmodule SlapWeb.DirectMessagingComponent do
       <% end %>
     </div>
     """
+  end
+
+  defp refresh_conversations(socket) do
+    conversations =
+      DirectMessaging.get_user_conversations_with_unread_counts(socket.assigns.current_user)
+
+    assign(socket, conversations: conversations)
   end
 
   defp conversation_title(conversation, current_user) do
@@ -334,10 +511,8 @@ defmodule SlapWeb.DirectMessagingComponent do
     end
   end
 
-  defp get_unread_count(conversation, current_user) do
-    case DirectMessaging.get_conversation_with_unread_count(current_user, conversation.id) do
-      {_, count} -> count
-      nil -> 0
-    end
+  defp get_unread_count(conversation, _current_user) do
+    # Use the pre-calculated unread count from the optimized query
+    Map.get(conversation, :unread_count, 0)
   end
 end

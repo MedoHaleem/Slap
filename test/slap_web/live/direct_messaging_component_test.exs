@@ -254,29 +254,6 @@ defmodule SlapWeb.DirectMessagingComponentTest do
       # Just verify that the component renders correctly
       assert html != nil
     end
-
-    test "updates conversation read status", %{user: user, conversation: conversation} do
-      # Preload the necessary associations for the conversation
-      conversation = Slap.Repo.preload(conversation, [:conversation_participants])
-
-      assigns = %{
-        id: "test-dm",
-        current_user: user,
-        conversations: [conversation],
-        selected_conversation: nil,
-        messages: [],
-        unread_count: 1,
-        loading: false,
-        message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
-      }
-
-      # Test that the component renders with the unread count
-      html = render_component(SlapWeb.DirectMessagingComponent, assigns)
-      assert html =~ "Direct Messages"
-      # The unread count might be displayed in different ways
-      assert html =~ "1 unread conversation" or html =~ "conversations"
-    end
   end
 
   describe "Error Handling" do
