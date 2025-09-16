@@ -52,6 +52,8 @@ defmodule SlapWeb.ChatRoomLive do
     |> assign(search_query: nil)
     # Initialize DM state
     |> assign(show_dm: false)
+    |> assign(dm_target_user: nil)
+    |> assign(dm_action: nil)
     |> stream_configure(:messages,
       dom_id: fn
         %Message{id: id} -> "messages-#{id}"
@@ -107,14 +109,14 @@ defmodule SlapWeb.ChatRoomLive do
           </div>
         </form>
       </div>
-      
+
       <%= if @search_query do %>
         <div class="p-4 bg-gray-100 search-results-container">
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-lg">Search Results</h3>
              <span class="text-sm text-gray-500">{length(@search_results)} results found</span>
           </div>
-          
+
           <div class="space-y-3">
             <%= for message <- @search_results do %>
               <div class="p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
@@ -135,19 +137,19 @@ defmodule SlapWeb.ChatRoomLive do
                           </button>
                         <% end %>
                       </div>
-                      
+
                       <%= if Map.get(message, :type) == :reply do %>
                         <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
                           In Thread
                         </span>
                       <% end %>
-                      
+
                       <span class="text-gray-500 text-sm ml-2 block">
                         {Calendar.strftime(message.inserted_at, "%b %d, %Y at %H:%M")}
                       </span>
                     </div>
                   </div>
-                  
+
                   <.link
                     patch={
                       if Map.get(message, :type) == :reply,
@@ -160,7 +162,7 @@ defmodule SlapWeb.ChatRoomLive do
                     View in context
                   </.link>
                 </div>
-                
+
                 <div class="text-gray-700 leading-relaxed">
                   {raw(highlight_search_terms(message.body, @search_query))}
                   <%= if Map.get(message, :type) == :reply do %>
@@ -182,7 +184,7 @@ defmodule SlapWeb.ChatRoomLive do
           timezone={@timezone}
         />
       <% end %>
-      
+
       <.live_component
         :if={@joined?}
         module={MessageFormComponent}
@@ -222,12 +224,12 @@ defmodule SlapWeb.ChatRoomLive do
             <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
               <.icon name="hero-phone" class="h-8 w-8 text-purple-600" />
             </div>
-            
+
             <h3 class="text-lg font-bold">Incoming Call</h3>
-            
+
             <p class="text-gray-600">{@incoming_call.username} is calling you</p>
           </div>
-          
+
           <div class="flex space-x-3 justify-center">
             <button
               id="accept-call-button"
@@ -239,7 +241,7 @@ defmodule SlapWeb.ChatRoomLive do
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
             </button>
-            
+
             <button
               phx-click="reject_call"
               class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full flex items-center"
@@ -257,7 +259,7 @@ defmodule SlapWeb.ChatRoomLive do
       on_cancel={JS.navigate(~p"/rooms/#{@room}")}
     >
       <.header>New chat room</.header>
-      
+
       <.live_component
         module={SlapWeb.ChatRoomLive.FormComponent}
         id="new-room-form-component"
@@ -273,6 +275,7 @@ defmodule SlapWeb.ChatRoomLive do
         module={SlapWeb.DirectMessagingComponent}
         current_user={@current_user}
         target_user={@dm_target_user}
+        dm_action={@dm_action}
       />
     <% end %>
     """
@@ -543,6 +546,24 @@ defmodule SlapWeb.ChatRoomLive do
     |> noreply()
   end
 
+  def handle_event("browse-groups", _params, socket) do
+    # Show public groups in the direct messaging component
+    socket
+    |> assign(:show_dm, true)
+    |> assign(:dm_action, :browse_groups)
+    |> assign(:dm_target_user, nil)
+    |> noreply()
+  end
+
+  def handle_event("create-group", _params, socket) do
+    # Open group creation modal in the direct messaging component
+    socket
+    |> assign(:show_dm, true)
+    |> assign(:dm_action, :create_group)
+    |> assign(:dm_target_user, nil)
+    |> noreply()
+  end
+
   def handle_event("close-profile", _, socket) do
     assign(socket, :profile, nil) |> noreply()
   end
@@ -698,7 +719,11 @@ defmodule SlapWeb.ChatRoomLive do
   end
 
   def handle_info(:close_dm_panel, socket) do
-    assign(socket, show_dm: false) |> noreply()
+    socket
+    |> assign(show_dm: false)
+    |> assign(dm_target_user: nil)
+    |> assign(dm_action: nil)
+    |> noreply()
   end
 
   def handle_info({:direct_message_deleted, message}, socket) do

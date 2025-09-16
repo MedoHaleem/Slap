@@ -1,6 +1,13 @@
 defmodule Slap.DirectMessaging do
   alias Slap.Accounts.User
-  alias Slap.Chat.{Conversation, DirectMessage, ConversationParticipant, Reaction}
+  alias Slap.Chat.{
+    Conversation,
+    DirectMessage,
+    ConversationParticipant,
+    ConversationSetting,
+    ConversationInvite,
+    Reaction
+  }
   alias Slap.{Repo, Uploads}
   import Ecto.Query
   require Logger
@@ -13,6 +20,9 @@ defmodule Slap.DirectMessaging do
   @rate_limit_window 60_000
   # max messages per user per conversation per window
   @rate_limit_max_messages 30
+
+  # Group conversation constants
+  @max_participants Conversation.max_participants()
 
   def subscribe_to_conversation(conversation) do
     Phoenix.PubSub.subscribe(@pubsub, conversation_topic(conversation.id))
@@ -31,6 +41,7 @@ defmodule Slap.DirectMessaging do
     participants = Keyword.get(opts, :participants, [])
     participant_ids = Keyword.get(opts, :participant_ids, [])
     creator = Keyword.get(opts, :creator)
+    conversation_type = Map.get(attrs, "type") || Map.get(attrs, :type) || "direct"
 
     # Validate that we don't have conflicting participant specifications
     cond do
@@ -62,12 +73,26 @@ defmodule Slap.DirectMessaging do
 
       participants != [] ->
         # Create conversation with user structs
-        create_conversation_with_users(attrs, participants, creator)
+        create_conversation_with_users(attrs, participants, creator, conversation_type)
 
       participant_ids != [] ->
         # Create conversation with user IDs
-        create_conversation_with_ids(attrs, participant_ids)
+        create_conversation_with_ids(attrs, participant_ids, conversation_type)
     end
+  end
+
+  def create_group_conversation(attrs \\ %{}, participants, creator) do
+    # Ensure type is set to group
+    group_attrs = Map.merge(attrs, %{type: "group", is_public: Map.get(attrs, :is_public, false)})
+
+    create_conversation(group_attrs, participants: participants, creator: creator)
+  end
+
+  def create_direct_message_conversation(attrs \\ %{}, user1, user2) do
+    # Ensure type is set to direct
+    dm_attrs = Map.merge(attrs, %{type: "direct"})
+
+    create_conversation(dm_attrs, participants: [user1, user2])
   end
 
   # Legacy function for backward compatibility
@@ -78,7 +103,7 @@ defmodule Slap.DirectMessaging do
     create_conversation(marked_attrs, participant_ids: participant_ids)
   end
 
-  defp create_conversation_with_users(attrs, participants, creator) do
+  defp create_conversation_with_users(attrs, participants, creator, conversation_type) do
     # Include creator in participants if provided
     all_participants =
       if creator do
@@ -87,62 +112,116 @@ defmodule Slap.DirectMessaging do
         participants |> Enum.uniq_by(& &1.id)
       end
 
-    if length(all_participants) < 2 do
-      {:error,
-       %Ecto.Changeset{
-         action: :insert,
-         errors: [participants: {"must have at least 2 participants", []}],
-         data: %Conversation{},
-         valid?: false
-       }}
-    else
-      Repo.transaction(fn ->
-        with {:ok, conversation} <-
-               %Conversation{}
-               |> Conversation.changeset(attrs)
-               |> Repo.insert(),
-             {:ok, _} <- add_participants_to_conversation(conversation, all_participants) do
-          conversation |> Repo.preload(conversation_participants: :user)
-        else
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
-      end)
+    # Validate participant limits based on conversation type
+    participant_count = length(all_participants)
+
+    validation_result = validate_participant_limits(conversation_type, participant_count)
+
+    case validation_result do
+      {:error, reason} ->
+        {:error,
+         %Ecto.Changeset{
+           action: :insert,
+           errors: [participants: {reason, []}],
+           data: %Conversation{},
+           valid?: false
+         }}
+
+      :ok ->
+        Repo.transaction(fn ->
+          with {:ok, conversation} <-
+                 %Conversation{}
+                 |> Conversation.changeset(attrs)
+                 |> Repo.insert(),
+               {:ok, _} <- add_participants_to_conversation(conversation, all_participants, creator) do
+            # Create default settings for the conversation
+            {:ok, _} = create_conversation_settings(conversation, conversation_type)
+
+            conversation |> Repo.preload(conversation_participants: :user)
+          else
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+        end)
     end
   end
 
-  defp create_conversation_with_ids(attrs, participant_ids) do
+  defp create_conversation_with_ids(attrs, participant_ids, conversation_type) do
     participant_ids = Enum.uniq(participant_ids)
 
-    if length(participant_ids) < 2 do
-      {:error,
-       %Ecto.Changeset{
-         action: :insert,
-         errors: [participants: {"must have at least 2 participants", []}],
-         data: %Conversation{},
-         valid?: false
-       }}
-    else
-      Repo.transaction(fn ->
-        with {:ok, conversation} <-
-               %Conversation{}
-               |> Conversation.changeset(attrs)
-               |> Repo.insert(),
-             {:ok, _} <- add_participant_ids_to_conversation(conversation, participant_ids) do
-          conversation |> Repo.preload(conversation_participants: :user)
-        else
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
-      end)
+    # Validate participant limits based on conversation type
+    participant_count = length(participant_ids)
+
+    validation_result = validate_participant_limits(conversation_type, participant_count)
+
+    case validation_result do
+      {:error, reason} ->
+        {:error,
+         %Ecto.Changeset{
+           action: :insert,
+           errors: [participants: {reason, []}],
+           data: %Conversation{},
+           valid?: false
+         }}
+
+      :ok ->
+        Repo.transaction(fn ->
+          with {:ok, conversation} <-
+                 %Conversation{}
+                 |> Conversation.changeset(attrs)
+                 |> Repo.insert(),
+               {:ok, _} <- add_participant_ids_to_conversation(conversation, participant_ids) do
+            # Create default settings for the conversation
+            {:ok, _} = create_conversation_settings(conversation, conversation_type)
+
+            conversation |> Repo.preload(conversation_participants: :user)
+          else
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+        end)
     end
   end
 
-  defp add_participants_to_conversation(conversation, participants) do
+  defp validate_participant_limits("direct", count) when count > 2 do
+    {:error, "direct conversations can have maximum 2 participants"}
+  end
+  defp validate_participant_limits("direct", count) when count < 2 do
+    {:error, "must have at least 2 participants"}
+  end
+  defp validate_participant_limits("group", count) when count < 2 do
+    {:error, "must have at least 2 participants"}
+  end
+  defp validate_participant_limits("group", count) when count > @max_participants do
+    {:error, "group conversations can have maximum #{@max_participants} participants"}
+  end
+  defp validate_participant_limits(_type, count) when count < 2 do
+    {:error, "must have at least 2 participants"}
+  end
+  defp validate_participant_limits(_type, _count), do: :ok
+
+  defp create_conversation_settings(conversation, conversation_type) do
+    settings_attrs = %{
+      conversation_id: conversation.id,
+      allow_participant_invites: conversation_type != "direct",
+      require_admin_approval: conversation_type == "group",
+      message_editing_enabled: true,
+      file_sharing_enabled: true,
+      max_participants: if(conversation_type == "direct", do: 2, else: 100)
+    }
+
+    %ConversationSetting{}
+    |> ConversationSetting.changeset(settings_attrs)
+    |> Repo.insert()
+  end
+
+  defp add_participants_to_conversation(conversation, participants, creator) do
     participants
     |> Enum.map(fn user ->
       %ConversationParticipant{}
       |> ConversationParticipant.changeset(%{
         conversation_id: conversation.id,
-        user_id: user.id
+        user_id: user.id,
+        role: determine_participant_role(conversation, user, creator),
+        can_invite: can_participant_invite(conversation, user, creator)
       })
     end)
     |> Enum.map(&Repo.insert/1)
@@ -159,7 +238,9 @@ defmodule Slap.DirectMessaging do
       %ConversationParticipant{}
       |> ConversationParticipant.changeset(%{
         conversation_id: conversation.id,
-        user_id: user_id
+        user_id: user_id,
+        role: "member", # Default role for ID-based addition
+        can_invite: conversation.type != "direct"
       })
     end)
     |> Enum.map(&Repo.insert/1)
@@ -168,6 +249,18 @@ defmodule Slap.DirectMessaging do
       {:error, error}, _ -> {:error, error}
       _, {:error, error} -> {:error, error}
     end)
+  end
+
+  defp determine_participant_role(conversation, user, creator) do
+    cond do
+      conversation.type == "direct" -> "member"
+      creator && user.id == creator.id -> "admin"
+      true -> "member"
+    end
+  end
+
+  defp can_participant_invite(conversation, user, creator) do
+    conversation.type != "direct" && (creator == nil || user.id != creator.id)
   end
 
   def get_conversation!(id) do
@@ -780,5 +873,249 @@ defmodule Slap.DirectMessaging do
         :ets.insert(table_name, {key, 1, now})
         :ok
     end
+  end
+
+  ## Group Conversation Management Functions
+
+  @doc """
+  Gets the conversation settings.
+  """
+  def get_conversation_settings(%Conversation{id: conversation_id}) do
+    case Repo.get_by(ConversationSetting, conversation_id: conversation_id) do
+      nil ->
+        # Create default settings if they don't exist
+        create_default_conversation_settings(conversation_id)
+      settings -> {:ok, settings}
+    end
+  end
+
+  defp create_default_conversation_settings(conversation_id) do
+    settings_attrs = %{
+      conversation_id: conversation_id,
+      allow_participant_invites: true,
+      require_admin_approval: false,
+      message_editing_enabled: true,
+      file_sharing_enabled: true,
+      max_participants: 100
+    }
+
+    %ConversationSetting{}
+    |> ConversationSetting.changeset(settings_attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates conversation settings. Only admins and moderators can update settings.
+  """
+  def update_conversation_settings(%Conversation{} = conversation, attrs, %User{id: user_id}) do
+    case get_user_role_in_conversation(conversation.id, user_id) do
+      {:ok, role} when role in ["admin", "moderator"] ->
+        case get_conversation_settings(conversation) do
+          {:ok, settings} ->
+            settings
+            |> ConversationSetting.changeset(attrs)
+            |> Repo.update()
+
+          {:error, _reason} = error -> error
+        end
+
+      {:ok, _role} ->
+        {:error, "Insufficient permissions to update conversation settings"}
+
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
+  Gets the user's role in a conversation.
+  """
+  def get_user_role_in_conversation(conversation_id, user_id) do
+    case get_conversation_participant(conversation_id, user_id) do
+      nil -> {:error, "User is not a participant in this conversation"}
+      participant -> {:ok, participant.role}
+    end
+  end
+
+  @doc """
+  Checks if a user has a specific permission in a conversation.
+  """
+  def user_has_permission?(conversation_id, user_id, permission) do
+    case get_user_role_in_conversation(conversation_id, user_id) do
+      {:ok, role} -> role_has_permission?(role, permission)
+      {:error, _} -> false
+    end
+  end
+
+  defp role_has_permission?(role, permission) do
+    permissions = %{
+      "admin" => [:manage_settings, :add_participants, :remove_participants,
+                 :delete_any_message, :promote_participants, :demote_participants,
+                 :delete_conversation, :kick_participants, :mute_participants],
+      "moderator" => [:add_participants, :remove_participants, :delete_messages,
+                     :kick_participants, :mute_participants],
+      "member" => [:send_messages, :react_to_messages, :view_participants,
+                  :leave_conversation, :invite_participants],
+      "restricted" => [:view_messages, :leave_conversation]
+    }
+
+    role_permissions = Map.get(permissions, role, [])
+    permission in role_permissions
+  end
+
+  @doc """
+  Promotes a participant to a higher role. Only admins can promote participants.
+  """
+  def promote_participant(%Conversation{id: conversation_id}, target_user_id, new_role, %User{id: user_id}) do
+    with {:ok, "admin"} <- get_user_role_in_conversation(conversation_id, user_id),
+         target_participant when not is_nil(target_participant) <- get_conversation_participant(conversation_id, target_user_id),
+         :ok <- validate_role_promotion(target_participant.role, new_role) do
+
+      target_participant
+      |> ConversationParticipant.changeset(%{role: new_role})
+      |> Repo.update()
+    else
+      {:ok, _role} -> {:error, "Only admins can promote participants"}
+      nil -> {:error, "Participant not found"}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_role_promotion(current_role, new_role) do
+    role_hierarchy = %{
+      "restricted" => 0,
+      "member" => 1,
+      "moderator" => 2,
+      "admin" => 3
+    }
+
+    current_level = Map.get(role_hierarchy, current_role, -1)
+    new_level = Map.get(role_hierarchy, new_role, -1)
+
+    if new_level > current_level do
+      :ok
+    else
+      {:error, "Cannot promote to same or lower role"}
+    end
+  end
+
+  @doc """
+  Creates an invitation for a user to join a conversation.
+  """
+  def create_conversation_invite(%Conversation{id: conversation_id}, invitee_id, %User{id: inviter_id}) do
+    # Check if inviter has permission to invite
+    with {:ok, inviter_role} <- get_user_role_in_conversation(conversation_id, inviter_id),
+         true <- role_has_permission?(inviter_role, :invite_participants),
+         {:ok, settings} <- get_conversation_settings(%Conversation{id: conversation_id}),
+         :ok <- validate_invite_permissions(settings, inviter_role),
+         {:ok, _} <- validate_user_not_already_participant(conversation_id, invitee_id) do
+
+      token = generate_invite_token()
+
+      %ConversationInvite{}
+      |> ConversationInvite.changeset(%{
+        conversation_id: conversation_id,
+        inviter_id: inviter_id,
+        invitee_id: invitee_id,
+        token: token
+      })
+      |> Repo.insert()
+    else
+      false -> {:error, "You don't have permission to invite users to this conversation"}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_invite_permissions(settings, inviter_role) do
+    cond do
+      settings.allow_participant_invites -> :ok
+      inviter_role in ["admin", "moderator"] -> :ok
+      true -> {:error, "Invitations are disabled for this conversation"}
+    end
+  end
+
+  defp validate_user_not_already_participant(conversation_id, user_id) do
+    case get_conversation_participant(conversation_id, user_id) do
+      nil -> {:ok, :not_participant}
+      _participant -> {:error, "User is already a participant in this conversation"}
+    end
+  end
+
+  defp generate_invite_token do
+    :crypto.strong_rand_bytes(32)
+    |> Base.url_encode64(padding: false)
+    |> binary_part(0, 32)
+  end
+
+  @doc """
+  Accepts a conversation invitation using a token.
+  """
+  def accept_conversation_invite(token, %User{id: user_id}) do
+    case Repo.get_by(ConversationInvite, token: token, invitee_id: user_id, status: "pending") do
+      nil ->
+        {:error, "Invalid or expired invitation"}
+
+      invite ->
+        if DateTime.compare(invite.expires_at, DateTime.utc_now()) == :lt do
+          # Expire the invite
+          invite
+          |> ConversationInvite.changeset(%{status: "expired"})
+          |> Repo.update()
+
+          {:error, "Invitation has expired"}
+        else
+          Repo.transaction(fn ->
+            with {:ok, participant} <- add_participant_to_conversation(
+                   %Conversation{id: invite.conversation_id},
+                   user_id
+                 ),
+                 {:ok, _} <-
+                   invite
+                   |> ConversationInvite.changeset(%{status: "accepted"})
+                   |> Repo.update() do
+              participant
+            else
+              {:error, changeset} -> Repo.rollback(changeset)
+            end
+          end)
+        end
+    end
+  end
+
+  @doc """
+  Gets pending invitations for a user.
+  """
+  def get_user_pending_invites(%User{id: user_id}) do
+    ConversationInvite
+    |> where([i], i.invitee_id == ^user_id and i.status == "pending")
+    |> where([i], i.expires_at > ^DateTime.utc_now())
+    |> preload([:conversation, :inviter])
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets all conversations of a specific type for a user.
+  """
+  def list_user_conversations_by_type(%User{id: user_id}, conversation_type) do
+    Conversation
+    |> join(:inner, [c], p in ConversationParticipant, on: c.id == p.conversation_id)
+    |> where([c, p], p.user_id == ^user_id and c.type == ^conversation_type)
+    |> order_by([c, p], desc: c.last_message_at)
+    |> preload(conversation_participants: :user)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets public groups that a user can join.
+  """
+  def list_public_groups(%User{id: user_id}, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 20)
+
+    Conversation
+    |> join(:left, [c], p in ConversationParticipant, on: c.id == p.conversation_id and p.user_id == ^user_id)
+    |> where([c, p], c.is_public == true and c.type == "group" and is_nil(p.id))
+    |> order_by([c], desc: c.last_message_at)
+    |> preload(conversation_participants: :user)
+    |> limit(^limit)
+    |> Repo.all()
   end
 end

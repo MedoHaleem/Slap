@@ -32,7 +32,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       html = render_component(SlapWeb.DirectMessagingComponent, assigns)
@@ -58,7 +61,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders without errors
@@ -78,7 +84,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       html = render_component(SlapWeb.DirectMessagingComponent, assigns)
@@ -112,7 +121,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders with the conversation
@@ -133,7 +145,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders with the message form
@@ -157,7 +172,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders with the message form
@@ -178,7 +196,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders with the close button
@@ -221,7 +242,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders without errors
@@ -245,7 +269,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders without errors
@@ -279,7 +306,10 @@ defmodule SlapWeb.DirectMessagingComponentTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        myself: %Phoenix.LiveComponent.CID{cid: 1}
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        show_group_settings: false,
+        show_participants: false,
+        current_user_role: nil
       }
 
       # Test that the component renders without errors

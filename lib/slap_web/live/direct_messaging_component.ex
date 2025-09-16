@@ -2,6 +2,7 @@ defmodule SlapWeb.DirectMessagingComponent do
   use SlapWeb, :live_component
 
   alias Slap.DirectMessaging
+  require Logger
 
   @impl true
   def update(assigns, socket) do
@@ -28,6 +29,16 @@ defmodule SlapWeb.DirectMessagingComponent do
           # If the message is not in the selected conversation, we still need to refresh the conversation list
           refresh_conversations(socket)
         end
+      else
+        socket
+      end
+
+    # Handle dm_action from parent
+    socket =
+      if Phoenix.LiveView.connected?(socket) and Map.has_key?(assigns, :dm_action) and assigns.dm_action do
+        socket = handle_dm_action(socket, assigns.dm_action)
+        # Clear the dm_action after processing to prevent repeated execution
+        assign(socket, dm_action: nil)
       else
         socket
       end
@@ -71,6 +82,35 @@ defmodule SlapWeb.DirectMessagingComponent do
             socket
           end
 
+        # Initialize group management UI state
+        socket =
+          if socket.assigns[:show_group_settings] == nil do
+            assign(socket, show_group_settings: false)
+          else
+            socket
+          end
+
+        socket =
+          if socket.assigns[:show_participants] == nil do
+            assign(socket, show_participants: false)
+          else
+            socket
+          end
+
+        socket =
+          if socket.assigns[:current_user_role] == nil do
+            assign(socket, current_user_role: nil)
+          else
+            socket
+          end
+
+        socket =
+          if socket.assigns[:creating_group] == nil do
+            assign(socket, creating_group: false)
+          else
+            socket
+          end
+
         # If we have a target user and no selected conversation, try to find or create a conversation
         socket =
           if socket.assigns[:target_user] && socket.assigns.selected_conversation == nil do
@@ -80,9 +120,7 @@ defmodule SlapWeb.DirectMessagingComponent do
             case DirectMessaging.get_conversation_between_users(current_user.id, target_user.id) do
               nil ->
                 # No conversation exists, create a new one
-                case DirectMessaging.create_conversation(%{},
-                       participants: [current_user, target_user]
-                     ) do
+                case DirectMessaging.create_direct_message_conversation(%{}, current_user, target_user) do
                   {:ok, conversation} ->
                     DirectMessaging.subscribe_to_conversation(conversation)
                     DirectMessaging.mark_conversation_read(conversation, current_user)
@@ -113,6 +151,28 @@ defmodule SlapWeb.DirectMessagingComponent do
                 socket
                 |> assign(selected_conversation: conversation, messages: messages)
                 |> refresh_conversations()
+            end
+          else
+            socket
+          end
+
+        # Initialize dm_target_user if not present (for group actions compatibility)
+        socket =
+          if !socket.assigns[:target_user] do
+            assign(socket, target_user: nil)
+          else
+            socket
+          end
+
+        # Update current user role if conversation is selected
+        socket =
+          if socket.assigns.selected_conversation do
+            case DirectMessaging.get_user_role_in_conversation(
+                   socket.assigns.selected_conversation.id,
+                   socket.assigns.current_user.id
+                 ) do
+              {:ok, role} -> assign(socket, current_user_role: role)
+              {:error, _} -> assign(socket, current_user_role: nil)
             end
           else
             socket
@@ -188,6 +248,154 @@ defmodule SlapWeb.DirectMessagingComponent do
   def handle_event("close_dm", _params, socket) do
     send(self(), :close_dm_panel)
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_group_settings", _params, socket) do
+    {:noreply, assign(socket, show_group_settings: !socket.assigns.show_group_settings)}
+  end
+
+  @impl true
+  def handle_event("toggle_participants", _params, socket) do
+    {:noreply, assign(socket, show_participants: !socket.assigns.show_participants)}
+  end
+
+  @impl true
+  def handle_event("create_group_conversation", _params, socket) do
+    current_user = socket.assigns.current_user
+
+    # Prevent rapid repeated clicks by checking if we're already processing
+    if socket.assigns[:creating_group] do
+      {:noreply, socket}
+    else
+      # Mark as creating to prevent duplicate requests
+      socket = assign(socket, creating_group: true)
+
+      case DirectMessaging.create_group_conversation(
+             %{title: "New Group", is_public: false},
+             [current_user],
+             current_user
+           ) do
+        {:ok, conversation} ->
+          DirectMessaging.subscribe_to_conversation(conversation)
+          DirectMessaging.mark_conversation_read(conversation, current_user)
+
+          messages = DirectMessaging.list_direct_messages(conversation.id,
+            current_user_id: current_user.id
+          )
+
+          socket =
+            socket
+            |> assign(selected_conversation: conversation, messages: messages, creating_group: false)
+            |> refresh_conversations()
+
+          {:noreply, socket}
+
+        {:error, reason} ->
+          Logger.error("Failed to create group conversation: #{inspect(reason)}")
+          {:noreply, put_flash(socket, :error, "Failed to create group conversation: #{inspect(reason)}") |> assign(creating_group: false)}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("update_conversation_title", %{"title" => title}, socket) do
+    current_user = socket.assigns.current_user
+    conversation = socket.assigns.selected_conversation
+
+    if can_manage_conversation?(conversation, current_user) do
+      case DirectMessaging.update_conversation(conversation, %{title: title}) do
+        {:ok, updated_conversation} ->
+          {:noreply, assign(socket, selected_conversation: updated_conversation)}
+
+        {:error, _changeset} ->
+          {:noreply, put_flash(socket, :error, "Failed to update conversation title")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to update this conversation")}
+    end
+  end
+
+  @impl true
+  def handle_event("invite_user", %{"user_id" => invitee_id}, socket) do
+    current_user = socket.assigns.current_user
+    conversation = socket.assigns.selected_conversation
+
+    case DirectMessaging.create_conversation_invite(conversation, String.to_integer(invitee_id), current_user) do
+      {:ok, _invite} ->
+        {:noreply, put_flash(socket, :info, "Invitation sent successfully")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to send invitation: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("leave_conversation", _params, socket) do
+    current_user = socket.assigns.current_user
+    conversation = socket.assigns.selected_conversation
+
+    case DirectMessaging.remove_participant_from_conversation(conversation, current_user.id) do
+      {_count, nil} ->
+        socket =
+          socket
+          |> assign(selected_conversation: nil, messages: [])
+          |> refresh_conversations()
+
+        {:noreply, put_flash(socket, :info, "You have left the conversation")}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "Failed to leave conversation")}
+    end
+  end
+
+  @impl true
+  def handle_event("promote_participant", %{"user_id" => user_id, "role" => new_role}, socket) do
+    current_user = socket.assigns.current_user
+    conversation = socket.assigns.selected_conversation
+
+    case DirectMessaging.promote_participant(conversation, String.to_integer(user_id), new_role, current_user) do
+      {:ok, _participant} ->
+        # Refresh conversation participants
+        updated_conversation = DirectMessaging.get_conversation!(conversation.id)
+        |> Slap.Repo.preload(conversation_participants: :user)
+
+        {:noreply, assign(socket, selected_conversation: updated_conversation)}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to promote participant: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("accept_invitation", %{"token" => token}, socket) do
+    current_user = socket.assigns.current_user
+
+    case DirectMessaging.accept_conversation_invite(token, current_user) do
+      {:ok, _participant} ->
+        socket = refresh_conversations(socket)
+        {:noreply, put_flash(socket, :info, "Successfully joined conversation")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to accept invitation: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("decline_invitation", %{"token" => token}, socket) do
+    current_user = socket.assigns.current_user
+
+    case Slap.Repo.get_by(Slap.Chat.ConversationInvite, token: token, invitee_id: current_user.id, status: "pending") do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invitation not found")}
+
+      invite ->
+        invite
+        |> Slap.Chat.ConversationInvite.changeset(%{status: "declined"})
+        |> Slap.Repo.update()
+
+        {:noreply, put_flash(socket, :info, "Invitation declined")}
+    end
   end
 
   def handle_event("reconnect", %{"last_message_id" => last_id}, socket) do
@@ -336,17 +544,139 @@ defmodule SlapWeb.DirectMessagingComponent do
             </div>
 
             <div class="flex-1 flex flex-col overflow-hidden">
-              <%= if @selected_conversation do %>
-                <!-- Conversation header -->
-                <div class="border-b border-gray-200 bg-white px-4 py-3">
-                  <h3 class="text-md font-semibold text-gray-900">
-                    {conversation_title(@selected_conversation, @current_user)}
-                  </h3>
+             <%= if @selected_conversation do %>
+               <!-- Conversation header -->
+               <div class="border-b border-gray-200 bg-white px-4 py-3">
+                 <div class="flex items-center justify-between">
+                   <div class="flex-1">
+                     <h3 class="text-md font-semibold text-gray-900">
+                       {conversation_title(@selected_conversation, @current_user)}
+                     </h3>
 
-                  <p class="text-xs text-gray-600">
-                    {length(@selected_conversation.conversation_participants)} participants
-                  </p>
-                </div>
+                     <p class="text-xs text-gray-600">
+                       {length(@selected_conversation.conversation_participants)} participants
+                       <%= if is_group_conversation?(@selected_conversation) do %>
+                         <span class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                           Group
+                         </span>
+                       <% end %>
+                     </p>
+                   </div>
+
+                   <div class="flex items-center space-x-2">
+                     <%= if is_group_conversation?(@selected_conversation) do %>
+                       <button
+                         phx-click="toggle_participants"
+                         phx-target={@myself}
+                         class="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         title="View Participants"
+                       >
+                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                         </svg>
+                       </button>
+                     <% end %>
+
+                     <%= if can_manage_conversation?(@selected_conversation, @current_user) do %>
+                       <button
+                         phx-click="toggle_group_settings"
+                         phx-target={@myself}
+                         class="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         title="Conversation Settings"
+                       >
+                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                         </svg>
+                       </button>
+                     <% end %>
+                   </div>
+                 </div>
+
+                 <!-- Participants Panel -->
+                 <%= if @show_participants && is_group_conversation?(@selected_conversation) do %>
+                   <div class="mt-3 border-t border-gray-100 pt-3">
+                     <h4 class="text-sm font-medium text-gray-700 mb-2">Participants</h4>
+                     <div class="space-y-2 max-h-32 overflow-y-auto">
+                       <%= for participant <- @selected_conversation.conversation_participants do %>
+                         <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                           <div class="flex items-center space-x-2">
+                             <img
+                               src={participant.user.avatar_path || "/images/profile_avatar.png"}
+                               class="w-6 h-6 rounded-full"
+                               alt={participant.user.username}
+                             />
+                             <span class="text-sm text-gray-900">
+                               {participant.user.username}
+                             </span>
+                             <%= raw(get_user_role_badge(participant.role)) %>
+                           </div>
+
+                           <%= if can_manage_conversation?(@selected_conversation, @current_user) &&
+                                 participant.user_id != @current_user.id do %>
+                             <div class="flex items-center space-x-1">
+                               <select
+                                 class="text-xs border border-gray-300 rounded px-1 py-0.5"
+                                 phx-change="promote_participant"
+                                 phx-value-user-id={participant.user_id}
+                                 phx-target={@myself}
+                               >
+                                 <option value="member" selected={participant.role == "member"}>Member</option>
+                                 <option value="moderator" selected={participant.role == "moderator"}>Moderator</option>
+                                 <option value="admin" selected={participant.role == "admin"}>Admin</option>
+                               </select>
+                             </div>
+                           <% end %>
+                         </div>
+                       <% end %>
+                     </div>
+
+                     <%= if can_invite_to_conversation?(@selected_conversation, @current_user) do %>
+                       <div class="mt-3">
+                         <form phx-submit="invite_user" phx-target={@myself} class="flex space-x-2">
+                           <input
+                             type="number"
+                             name="user_id"
+                             placeholder="User ID to invite"
+                             class="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+                             required
+                           />
+                           <button
+                             type="submit"
+                             class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                           >
+                             Invite
+                           </button>
+                         </form>
+                       </div>
+                     <% end %>
+                   </div>
+                 <% end %>
+
+                 <!-- Settings Panel -->
+                 <%= if @show_group_settings && can_manage_conversation?(@selected_conversation, @current_user) do %>
+                   <div class="mt-3 border-t border-gray-100 pt-3">
+                     <h4 class="text-sm font-medium text-gray-700 mb-2">Conversation Settings</h4>
+                     <form phx-submit="update_conversation_title" phx-target={@myself} class="space-y-3">
+                       <div>
+                         <label class="block text-xs text-gray-600">Conversation Title</label>
+                         <input
+                           type="text"
+                           name="title"
+                           value={@selected_conversation.title}
+                           class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                         />
+                       </div>
+                       <button
+                         type="submit"
+                         class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                       >
+                         Update Title
+                       </button>
+                     </form>
+                   </div>
+                 <% end %>
+               </div>
 
     <!-- Messages list -->
                 <div
@@ -457,9 +787,57 @@ defmodule SlapWeb.DirectMessagingComponent do
                       <p class="mt-1 text-sm text-gray-500">
                         Start a new conversation by clicking the DM icon next to a user's name
                       </p>
+
+                      <button
+                        phx-click="create_group_conversation"
+                        phx-target={@myself}
+                        disabled={@creating_group}
+                        class={"mt-3 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 #{if @creating_group, do: "bg-gray-400 cursor-not-allowed", else: "bg-blue-600 hover:bg-blue-700"}"}
+                      >
+                        {if @creating_group, do: "Creating...", else: "Create Group Conversation"}
+                      </button>
                     </div>
                   </div>
                 <% end %>
+
+                <!-- Pending Invitations -->
+                <div class="border-t border-gray-200 bg-gray-50 p-4">
+                  <h4 class="text-sm font-medium text-gray-700 mb-2">Pending Invitations</h4>
+                  <%= for invite <- get_user_pending_invites(@current_user) do %>
+                    <div class="flex items-center justify-between p-2 bg-white rounded border mb-2">
+                      <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">
+                          {invite.conversation.title}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                          Invited by {invite.inviter.username}
+                        </p>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button
+                          phx-click="accept_invitation"
+                          phx-value-token={invite.token}
+                          phx-target={@myself}
+                          class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          phx-click="decline_invitation"
+                          phx-value-token={invite.token}
+                          phx-target={@myself}
+                          class="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <%= if Enum.empty?(get_user_pending_invites(@current_user)) do %>
+                    <p class="text-xs text-gray-500">No pending invitations</p>
+                  <% end %>
+                </div>
               <% end %>
             </div>
           </div>
@@ -477,6 +855,32 @@ defmodule SlapWeb.DirectMessagingComponent do
       <% end %>
     </div>
     """
+  end
+
+
+  defp can_manage_conversation?(conversation, current_user) do
+    case DirectMessaging.get_user_role_in_conversation(conversation.id, current_user.id) do
+      {:ok, role} -> role in ["admin", "moderator"]
+      {:error, _} -> false
+    end
+  end
+
+  defp can_invite_to_conversation?(conversation, current_user) do
+    DirectMessaging.user_has_permission?(conversation.id, current_user.id, :invite_participants)
+  end
+
+  defp is_group_conversation?(conversation) do
+    conversation.type == "group"
+  end
+
+  defp get_user_role_badge(role) do
+    case role do
+      "admin" -> ~s(<span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">Admin</span>)
+      "moderator" -> ~s(<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Moderator</span>)
+      "member" -> ~s(<span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Member</span>)
+      "restricted" -> ~s(<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-1 rounded-full">Restricted</span>)
+      _ -> ""
+    end
   end
 
   defp refresh_conversations(socket) do
@@ -514,5 +918,55 @@ defmodule SlapWeb.DirectMessagingComponent do
   defp get_unread_count(conversation, _current_user) do
     # Use the pre-calculated unread count from the optimized query
     Map.get(conversation, :unread_count, 0)
+  end
+
+  defp get_user_pending_invites(current_user) do
+    DirectMessaging.get_user_pending_invites(current_user)
+  end
+
+  defp handle_dm_action(socket, :browse_groups) do
+    # Handle browse groups action - show public conversations
+    public_conversations = DirectMessaging.list_public_groups(socket.assigns.current_user)
+    assign(socket,
+      conversations: public_conversations,
+      selected_conversation: nil,
+      messages: []
+    )
+  end
+
+  defp handle_dm_action(socket, :create_group) do
+    # Handle create group action - trigger group creation
+    current_user = socket.assigns.current_user
+
+    case DirectMessaging.create_group_conversation(
+           %{title: "New Group", is_public: false},
+           [current_user],
+           current_user
+         ) do
+      {:ok, conversation} ->
+        DirectMessaging.subscribe_to_conversation(conversation)
+        DirectMessaging.mark_conversation_read(conversation, current_user)
+
+        messages = DirectMessaging.list_direct_messages(conversation.id,
+          current_user_id: current_user.id
+        )
+
+        socket
+        |> assign(selected_conversation: conversation, messages: messages)
+        |> refresh_conversations()
+
+      {:error, _reason} ->
+        put_flash(socket, :error, "Failed to create group conversation")
+    end
+  end
+
+  defp handle_dm_action(socket, nil) do
+    # No action specified, return socket as-is
+    socket
+  end
+
+  defp handle_dm_action(socket, _action) do
+    # Unknown action, log and return socket
+    socket
   end
 end
