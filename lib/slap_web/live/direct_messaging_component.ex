@@ -508,6 +508,9 @@ defmodule SlapWeb.DirectMessagingComponent do
 
   @impl true
   def render(assigns) do
+    # Ensure minimal defaults for template rendering when render_component/2 is used
+    # (render_component passes assigns directly and does not call the component's update/2)
+    assigns = Map.put_new(assigns, :creating_group, false)
     ~H"""
     <div class="fixed inset-0 z-50 overflow-hidden">
       <!-- Overlay background -->
