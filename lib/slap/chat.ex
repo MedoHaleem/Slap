@@ -1,12 +1,12 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
   alias Slap.Chat.{Message, Room, RoomMembership, Reply, Reaction, MessageAttachment}
-  alias Slap.{Repo, Uploads}
+  alias Slap.{Repo, Uploads, Constants, Authorization, RateLimiter, ErrorHandler, Pagination, QueryBuilder, Messaging}
   import Ecto.Changeset
   import Ecto.Query
 
   @pubsub Slap.PubSub
-  @room_page_size 10
+  @room_page_size Constants.default_page_size()
 
   def subscribe_to_room(room) do
     Phoenix.PubSub.subscribe(@pubsub, topic(room.id))
@@ -16,7 +16,7 @@ defmodule Slap.Chat do
     Phoenix.PubSub.unsubscribe(@pubsub, topic(room.id))
   end
 
-  defp topic(room_id), do: "chat_room:#{room_id}"
+  defp topic(room_id), do: Constants.pubsub_topic(:room, room_id)
 
   def change_room(room, attrs \\ %{}) do
     Room.changeset(room, attrs)
@@ -160,31 +160,39 @@ defmodule Slap.Chat do
   end
 
   def create_message(room, attrs, user) do
-    result =
-      Repo.transaction(fn ->
-        with {:ok, message} <-
-               %Message{room: room, user: user, replies: [], reactions: []}
-               |> Message.changeset(attrs)
-               |> Repo.insert() do
-          # Handle file attachments
-          case attrs["pdf_file"] do
-            %Plug.Upload{} = upload ->
-              create_message_attachment(message, upload)
-
-            _ ->
-              :ok
-          end
-
-          message = message |> Repo.preload([:attachments])
-          Phoenix.PubSub.broadcast!(@pubsub, topic(room.id), {:new_message, message})
-          message
+    Repo.transaction(fn ->
+      with {:ok, message} <-
+             %Message{}
+             |> Message.changeset(attrs)
+             |> Ecto.Changeset.put_assoc(:room, room)
+             |> Ecto.Changeset.put_assoc(:user, user)
+             |> Repo.insert() do
+        # Handle PDF attachment if present
+        if Map.has_key?(attrs, "pdf_file") do
+          create_message_attachment(message, attrs["pdf_file"])
         end
-      end)
 
-    case result do
-      {:ok, message} -> {:ok, message}
-      {:error, _} = error -> error
-    end
+        # Preload all necessary associations
+        message = message |> Repo.preload([:user, :attachments, :reactions, :replies])
+
+        # Broadcast the new message
+        Phoenix.PubSub.broadcast!(
+          @pubsub,
+          topic(room.id),
+          {:new_message, message}
+        )
+
+        {:ok, message}
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  def update_message(%Message{} = message, attrs) do
+    message
+    |> Message.changeset(attrs)
+    |> Repo.update()
   end
 
   def create_message_attachment(message, upload) do
@@ -225,110 +233,37 @@ defmodule Slap.Chat do
   end
 
   def list_messages_in_room(%Room{id: room_id}, opts \\ []) do
-    Message
-    |> where([m], m.room_id == ^room_id)
-    |> order_by([m], desc: :inserted_at, asc: :id)
-    |> preload_message_user_and_replies()
-    |> preload_reactions()
-    |> preload_attachments()
-    |> Repo.paginate(
-      after: opts[:after],
-      limit: 50,
-      cursor_fields: [inserted_at: :desc, id: :asc]
+    # Use QueryBuilder to build the query
+    base_query = QueryBuilder.messages_query(
+      schema: Message,
+      room_id: room_id,
+      include_reactions: true,
+      include_attachments: true,
+      include_replies: true
     )
+
+    # Apply cursor-based pagination
+    QueryBuilder.cursor_paginate_query(base_query, opts)
   end
 
   def search_messages(room_id, query, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 50)
-    offset = Keyword.get(opts, :offset, 0)
-    include_threads = Keyword.get(opts, :include_threads, true)
+    # Use QueryBuilder for search
+    base_query = QueryBuilder.messages_query(
+      schema: Message,
+      room_id: room_id,
+      include_reactions: true,
+      include_attachments: true,
+      include_replies: true
+    )
 
-    if query in [nil, ""] do
-      []
-    else
-      # Use PostgreSQL's full-text search for better performance
-      # Properly escape the query for tsquery by replacing spaces with & and escaping special characters
-      # Remove special characters that are not allowed in tsquery
-      cleaned_query = String.replace(query, ~r/[&|!<>():*]/, " ")
-      search_terms = String.split(cleaned_query, ~r/\s+/, trim: true)
+    search_query = QueryBuilder.search_query(base_query, query, search_field: :body)
+    paginated_query = QueryBuilder.cursor_paginate_query(search_query, opts)
 
-      search_query =
-        if length(search_terms) > 1 do
-          Enum.join(search_terms, " & ")
-        else
-          Enum.join(search_terms, "")
-        end
-
-      main_messages_query =
-        Message
-        |> where([m], m.room_id == ^room_id)
-        |> where(
-          [m],
-          fragment("to_tsvector('english', ?) @@ to_tsquery('english', ?)", m.body, ^search_query)
-        )
-        |> preload_message_user_and_replies()
-        |> preload_reactions()
-        |> preload_attachments()
-        |> limit(^limit)
-        |> offset(^offset)
-        |> order_by([m], desc: :inserted_at)
-
-      if include_threads do
-        # Also search in thread replies
-        replies_query =
-          Reply
-          |> join(:inner, [r], m in Message, on: r.message_id == m.id)
-          |> where([r, m], m.room_id == ^room_id)
-          |> where(
-            [r],
-            fragment(
-              "to_tsvector('english', ?) @@ to_tsquery('english', ?)",
-              r.body,
-              ^search_query
-            )
-          )
-          |> preload([:user, :message])
-          |> order_by([r], desc: :inserted_at)
-          |> limit(^limit)
-          |> offset(^offset)
-
-        # Combine main messages and replies, then sort by insertion time
-        main_messages = Repo.all(main_messages_query)
-        replies = Repo.all(replies_query)
-
-        # Combine and sort results
-        combined = Enum.map(main_messages, &{:message, &1}) ++ Enum.map(replies, &{:reply, &1})
-
-        sorted_combined =
-          Enum.sort_by(
-            combined,
-            fn
-              {:message, m} -> m.inserted_at
-              {:reply, r} -> r.inserted_at
-            end,
-            &(DateTime.compare(&1, &2) != :lt)
-          )
-
-        # Extract just the messages/replies in the correct order
-        Enum.map(sorted_combined, fn
-          {:message, m} ->
-            m
-
-          {:reply, r} ->
-            # Convert reply to a message-like structure for consistency
-            %{
-              id: r.id,
-              body: r.body,
-              user: r.user,
-              inserted_at: r.inserted_at,
-              type: :reply,
-              parent_message_id: r.message_id,
-              parent_message: get_message!(r.message_id)
-            }
-        end)
-      else
-        Repo.all(main_messages_query)
-      end
+    # Execute the query and return results
+    case paginated_query do
+      %{entries: entries} = query -> Repo.all(query)
+      query when is_struct(query, Ecto.Query) -> Repo.all(query)
+      other -> other
     end
   end
 

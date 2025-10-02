@@ -291,7 +291,7 @@ defmodule SlapWeb.ChatRoomLive do
           Chat.get_first_room!()
       end
 
-    page = Chat.list_messages_in_room(room)
+    query = Chat.list_messages_in_room(room)
     last_read_id = Chat.get_last_read_id(room, socket.assigns.current_user)
 
     Chat.update_last_read_id(room, socket.assigns.current_user)
@@ -310,9 +310,13 @@ defmodule SlapWeb.ChatRoomLive do
       highlight_message_id: highlight_message_id
     )
     |> stream(:messages, [], reset: true)
-    |> stream_message_page(page)
+    |> stream_message_page(query)
     |> assign_message_form(Chat.change_message(%Message{}))
-    |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
+    |> then(fn socket ->
+      # Check if we have more messages based on the message cursor
+      can_load_more = !is_nil(socket.assigns[:message_cursor])
+      push_event(socket, "reset_pagination", %{can_load_more: can_load_more})
+    end)
     |> push_event("scroll_messages_to_bottom", %{})
     |> update(:rooms, fn rooms ->
       room_id = room.id
@@ -333,6 +337,11 @@ defmodule SlapWeb.ChatRoomLive do
     case Integer.parse(thread_message_id) do
       {thread_id, _} ->
         thread_message = Chat.get_message!(thread_id)
+
+        # Ensure replies are preloaded with user associations
+        thread_message =
+          thread_message
+          |> Slap.Repo.preload(replies: [:user])
 
         socket
         |> assign(:thread, thread_message)
@@ -378,16 +387,41 @@ defmodule SlapWeb.ChatRoomLive do
     |> assign(:message_cursor, page.metadata.after)
   end
 
+  defp stream_message_page(socket, %{entries: entries, metadata: metadata}) do
+    last_read_id = socket.assigns.last_read_id
+
+    messages =
+      entries
+      |> Enum.reverse()
+      |> insert_date_dividers(socket.assigns.timezone)
+      |> insert_unread_marker(last_read_id)
+      |> Enum.reverse()
+
+    socket
+    |> stream(:messages, messages, at: 0)
+    |> assign(:message_cursor, metadata.next_cursor)
+  end
+
+  defp stream_message_page(socket, query) when is_struct(query, Ecto.Query) do
+    # Convert the query to a paginated result
+    page = Slap.Pagination.paginate(query)
+    stream_message_page(socket, page)
+  end
+
   def handle_event("load-more-messages", _, socket) do
-    page =
+    query =
       Chat.list_messages_in_room(
         socket.assigns.room,
         after: socket.assigns.message_cursor
       )
 
     socket
-    |> stream_message_page(page)
-    |> reply(%{can_load_more: !is_nil(page.metadata.after)})
+    |> stream_message_page(query)
+    |> then(fn socket ->
+      # Check if we have more messages based on the message cursor
+      can_load_more = !is_nil(socket.assigns[:message_cursor])
+      reply(socket, %{can_load_more: can_load_more})
+    end)
   end
 
   def handle_event("close-thread", _, socket) do
@@ -449,14 +483,18 @@ defmodule SlapWeb.ChatRoomLive do
 
     if trimmed_query == "" do
       # Refetch the original room messages when search is cleared
-      page = Chat.list_messages_in_room(socket.assigns.room)
+      query = Chat.list_messages_in_room(socket.assigns.room)
 
       socket =
         socket
         |> assign(search_results: [], search_query: nil, search_count: 0)
         |> stream(:messages, [], reset: true)
-        |> stream_message_page(page)
-        |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
+        |> stream_message_page(query)
+        |> then(fn socket ->
+          # Check if we have more messages based on the message cursor
+          can_load_more = !is_nil(socket.assigns[:message_cursor])
+          push_event(socket, "reset_pagination", %{can_load_more: can_load_more})
+        end)
 
       socket |> noreply()
     else
@@ -476,14 +514,18 @@ defmodule SlapWeb.ChatRoomLive do
 
   def handle_event("clear_search", _, socket) do
     # Refetch the original room messages when search is cleared
-    page = Chat.list_messages_in_room(socket.assigns.room)
+    query = Chat.list_messages_in_room(socket.assigns.room)
 
     socket =
       socket
       |> assign(search_results: [], search_query: nil, search_count: 0)
       |> stream(:messages, [], reset: true)
-      |> stream_message_page(page)
-      |> push_event("reset_pagination", %{can_load_more: !is_nil(page.metadata.after)})
+      |> stream_message_page(query)
+      |> then(fn socket ->
+        # Check if we have more messages based on the message cursor
+        can_load_more = !is_nil(socket.assigns[:message_cursor])
+        push_event(socket, "reset_pagination", %{can_load_more: can_load_more})
+      end)
 
     socket |> noreply()
   end

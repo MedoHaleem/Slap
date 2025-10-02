@@ -129,8 +129,8 @@ defmodule SlapWeb.ChatRoomLive.IndexTest do
 
   describe "Pagination" do
     test "shows pagination when there are multiple pages", %{conn: conn} do
-      # Create enough rooms to trigger pagination (more than 10)
-      for i <- 1..15 do
+      # Create enough rooms to trigger pagination (more than 20)
+      for i <- 1..25 do
         room_fixture(%{name: "room-#{i}", topic: "Topic #{i}"})
       end
 
@@ -143,7 +143,7 @@ defmodule SlapWeb.ChatRoomLive.IndexTest do
 
     test "navigates to different pages", %{conn: conn} do
       # Create enough rooms for multiple pages
-      for i <- 1..15 do
+      for i <- 1..25 do
         room_fixture(%{name: "room-#{i}", topic: "Topic #{i}"})
       end
 

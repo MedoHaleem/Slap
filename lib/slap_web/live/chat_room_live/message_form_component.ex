@@ -133,6 +133,15 @@ defmodule SlapWeb.ChatRoomLive.MessageFormComponent do
 
           socket |> noreply()
 
+        {:error, error_msg} when is_binary(error_msg) ->
+          # Handle rate limiting errors (string errors)
+          changeset =
+            %Chat.Message{}
+            |> Chat.change_message(message_params)
+            |> Ecto.Changeset.add_error(:body, error_msg)
+
+          assign(socket, form: to_form(changeset)) |> noreply()
+
         {:error, changeset} ->
           assign(socket, form: to_form(changeset)) |> noreply()
       end

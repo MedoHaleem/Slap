@@ -36,7 +36,7 @@ defmodule SlapWeb.ChatComponents do
         >
           <.icon name="hero-face-smile" class="h-5 w-5" />
         </button>
-        
+
         <button
           :if={!@in_thread?}
           phx-click="show-thread"
@@ -45,7 +45,7 @@ defmodule SlapWeb.ChatComponents do
         >
           <.icon name="hero-chat-bubble-bottom-center-text" class="h-4 w-4" />
         </button>
-        
+
         <button
           :if={@current_user.id == @message.user_id}
           class="text-red-500 hover:text-red-800 cursor-pointer"
@@ -57,7 +57,7 @@ defmodule SlapWeb.ChatComponents do
           <.icon name="hero-trash" class="h-4 w-4" />
         </button>
       </div>
-      
+
       <.user_avatar
         user={@message.user}
         class="h-10 w-10 rounded cursor-pointer"
@@ -74,7 +74,7 @@ defmodule SlapWeb.ChatComponents do
             >
               <span>{@message.user.username}</span>
             </.link>
-            
+
             <%= if @current_user.id != @message.user.id do %>
               <button
                 phx-click="start-direct-message"
@@ -86,13 +86,15 @@ defmodule SlapWeb.ChatComponents do
               </button>
             <% end %>
           </div>
-          
+
           <span :if={@timezone} class="ml-1 text-xs text-gray-500">
             {message_timestamp(@message, @timezone)}
           </span>
-          
+
           <div
-            :if={is_struct(@message, Message) && Enum.any?(@message.reactions)}
+            :if={is_struct(@message, Message) &&
+                  not is_struct(@message.reactions, Ecto.Association.NotLoaded) &&
+                  Enum.any?(@message.reactions)}
             class="flex space-x-2 mt-2"
           >
             <%= for {emoji, count, me?} <- enumerate_reactions(@message.reactions, @current_user) do %>
@@ -110,26 +112,26 @@ defmodule SlapWeb.ChatComponents do
               </button>
             <% end %>
           </div>
-          
+
           <p class="text-sm">{@message.body}</p>
-          
+
           <div :if={is_struct(@message, Message) && Enum.any?(@message.attachments)}>
             <%= for attachment <- @message.attachments do %>
               <div class="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200 max-w-sm">
                 <div class="flex-shrink-0">
                   <.icon name="hero-document-text" class="h-5 w-5 text-red-600" />
                 </div>
-                
+
                 <div class="overflow-hidden flex-grow">
                   <p class="text-xs font-medium text-gray-700 truncate" title={attachment.file_name}>
                     {attachment.file_name}
                   </p>
-                  
+
                   <p class="text-xs text-gray-500">
                     {format_file_size(attachment.file_size)}
                   </p>
                 </div>
-                
+
                 <a
                   href={attachment.file_path}
                   target="_blank"
@@ -141,9 +143,11 @@ defmodule SlapWeb.ChatComponents do
               </div>
             <% end %>
           </div>
-          
+
           <div
-            :if={!@in_thread? && Enum.any?(@message.replies)}
+            :if={!@in_thread? &&
+                  not is_struct(@message.replies, Ecto.Association.NotLoaded) &&
+                  Enum.any?(@message.replies)}
             class="inline-flex items-center mt-2 rounded border border-transparent hover:border-slate-200 hover:bg-slate-50 py-1 pr-2 box-border cursor-pointer"
             phx-click="show-thread"
             phx-value-id={@message.id}
@@ -165,16 +169,23 @@ defmodule SlapWeb.ChatComponents do
   end
 
   defp thread_avatars(assigns) do
-    users =
-      assigns.replies
-      |> Enum.map(& &1.user)
-      |> Enum.uniq_by(& &1.id)
+    # Check if replies are loaded
+    if not is_struct(assigns.replies, Ecto.Association.NotLoaded) do
+      users =
+        assigns.replies
+        |> Enum.filter(fn reply -> not is_struct(reply.user, Ecto.Association.NotLoaded) end)
+        |> Enum.map(& &1.user)
+        |> Enum.uniq_by(& &1.id)
 
-    assigns = assign(assigns, :users, users)
+      assigns = assign(assigns, :users, users)
 
-    ~H"""
-    <.user_avatar :for={user <- @users} class="h-6 w-6 rounded shrink-0 ml-1" user={user} />
-    """
+      ~H"""
+      <.user_avatar :for={user <- @users} class="h-6 w-6 rounded shrink-0 ml-1" user={user} />
+      """
+    else
+      ~H"""
+      """
+    end
   end
 
   def message_timestamp(message, timezone) do

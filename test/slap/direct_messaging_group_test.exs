@@ -66,7 +66,8 @@ defmodule Slap.DirectMessagingGroupTest do
 
     test "create_group_conversation/3 validates maximum participants", %{admin: admin} do
       # Create 1001 users (exceeds max of 1000)
-      participants = for i <- 1..1001, do: user_fixture(%{username: "user#{i}"})
+      # Use default user fixture which generates unique usernames
+      participants = for _i <- 1..1001, do: user_fixture()
 
       result = DirectMessaging.create_group_conversation(
         %{title: "Too Large Group"},
@@ -441,8 +442,8 @@ defmodule Slap.DirectMessagingGroupTest do
     } do
       # Create more public groups - need at least 2 participants each
       for i <- 1..5 do
-        user = user_fixture(%{username: "publicuser#{i}"})
-        other_user = user_fixture(%{username: "otheruser#{i}"})
+        user = user_fixture()
+        other_user = user_fixture()
         {:ok, _} = DirectMessaging.create_group_conversation(
           %{title: "Public Group #{i}", is_public: true},
           [user, other_user],

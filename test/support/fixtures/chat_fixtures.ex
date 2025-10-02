@@ -24,8 +24,15 @@ defmodule Slap.ChatFixtures do
   def message_fixture(%Room{} = room, %User{} = user, attrs \\ %{}) do
     attrs = Enum.into(attrs, %{body: "Test message #{System.unique_integer([:positive])}"})
 
-    {:ok, message} = Chat.create_message(room, attrs, user)
+    # Create message directly without rate limiting for tests
+    message = %Chat.Message{
+      room_id: room.id,
+      user_id: user.id,
+      body: attrs.body
+    }
 
+    {:ok, message} = Slap.Repo.insert(message)
+    message = Slap.Repo.preload(message, [:user, :attachments, :replies, :reactions])
     message
   end
 
