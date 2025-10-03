@@ -5,6 +5,21 @@ defmodule Slap.Chat.MessageAttachment do
   alias Slap.Chat.Message
   alias Slap.Chat.DirectMessage
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          file_name: String.t(),
+          file_path: String.t(),
+          file_size: integer(),
+          file_type: String.t(),
+          file: any(),
+          message_id: integer() | nil,
+          direct_message_id: integer() | nil,
+          message: Message.t() | Ecto.Association.NotLoaded.t(),
+          direct_message: DirectMessage.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "message_attachments" do
     field :file_name, :string
     field :file_path, :string

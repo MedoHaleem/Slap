@@ -7,6 +7,21 @@ defmodule Slap.Chat.ConversationParticipant do
 
   @roles ["admin", "moderator", "member", "restricted"]
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          conversation_id: integer(),
+          user_id: integer(),
+          last_read_at: DateTime.t() | nil,
+          role: String.t(),
+          joined_at: DateTime.t() | nil,
+          notifications_enabled: boolean(),
+          can_invite: boolean(),
+          conversation: Conversation.t() | Ecto.Association.NotLoaded.t(),
+          user: User.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "conversation_participants" do
     belongs_to :conversation, Conversation
     belongs_to :user, User
@@ -22,7 +37,15 @@ defmodule Slap.Chat.ConversationParticipant do
   @doc false
   def changeset(conversation_participant, attrs) do
     conversation_participant
-    |> cast(attrs, [:conversation_id, :user_id, :last_read_at, :role, :joined_at, :notifications_enabled, :can_invite])
+    |> cast(attrs, [
+      :conversation_id,
+      :user_id,
+      :last_read_at,
+      :role,
+      :joined_at,
+      :notifications_enabled,
+      :can_invite
+    ])
     |> validate_required([:conversation_id, :user_id, :role])
     |> validate_inclusion(:role, @roles)
     |> validate_number(:conversation_id, greater_than: 0)

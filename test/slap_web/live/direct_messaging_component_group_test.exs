@@ -13,20 +13,24 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
       member = user_fixture()
 
       # Create a group conversation with admin as creator
-      {:ok, conversation} = Slap.DirectMessaging.create_group_conversation(
-        %{title: "Test Group", is_public: false},
-        [admin, moderator, member],
-        admin
-      )
+      {:ok, conversation} =
+        Slap.DirectMessaging.create_group_conversation(
+          %{title: "Test Group", is_public: false},
+          [admin, moderator, member],
+          admin
+        )
 
       # Verify admin has admin role
-      {:ok, admin_role} = Slap.DirectMessaging.get_user_role_in_conversation(conversation.id, admin.id)
+      {:ok, admin_role} =
+        Slap.DirectMessaging.get_user_role_in_conversation(conversation.id, admin.id)
+
       if admin_role != "admin" do
         raise "Admin should have admin role, got #{admin_role}"
       end
 
       # Set moderator role
-      {:ok, _} = Slap.DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
+      {:ok, _} =
+        Slap.DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
 
       %{
         admin: admin,
@@ -153,7 +157,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         loading: false,
         message_form: to_form(%{"body" => ""}),
         show_group_settings: false,
-        show_participants: true, # Show participants panel
+        # Show participants panel
+        show_participants: true,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
       }
@@ -185,7 +190,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
 
       assigns = %{
         id: "test-dm",
-        current_user: admin, # Test with actual admin user
+        # Test with actual admin user
+        current_user: admin,
         conversations: [conversation],
         selected_conversation: conversation,
         messages: [],
@@ -193,7 +199,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         loading: false,
         message_form: to_form(%{"body" => ""}),
         show_group_settings: false,
-        show_participants: true, # Show participants panel
+        # Show participants panel
+        show_participants: true,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
       }
@@ -230,7 +237,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         loading: false,
         message_form: to_form(%{"body" => ""}),
         show_group_settings: false,
-        show_participants: true, # Show participants panel
+        # Show participants panel
+        show_participants: true,
         current_user_role: "member",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
       }
@@ -252,14 +260,16 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
 
       assigns = %{
         id: "test-dm",
-        current_user: admin, # This should be admin, not member
+        # This should be admin, not member
+        current_user: admin,
         conversations: [conversation],
         selected_conversation: conversation,
         messages: [],
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        show_group_settings: true, # Show settings panel
+        # Show settings panel
+        show_group_settings: true,
         show_participants: false,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
@@ -285,16 +295,17 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
 
       # For testing purposes, we'll create the invitation directly in the database
       # to bypass the permission validation issue
-      {:ok, _invite} = %Slap.Chat.ConversationInvite{}
-      |> Slap.Chat.ConversationInvite.changeset(%{
-        conversation_id: conversation.id,
-        inviter_id: admin.id,
-        invitee_id: new_user.id,
-        token: "test-token-#{System.unique_integer([:positive])}",
-        status: "pending",
-        expires_at: DateTime.utc_now() |> DateTime.add(7 * 24 * 60 * 60, :second)
-      })
-      |> Slap.Repo.insert()
+      {:ok, _invite} =
+        %Slap.Chat.ConversationInvite{}
+        |> Slap.Chat.ConversationInvite.changeset(%{
+          conversation_id: conversation.id,
+          inviter_id: admin.id,
+          invitee_id: new_user.id,
+          token: "test-token-#{System.unique_integer([:positive])}",
+          status: "pending",
+          expires_at: DateTime.utc_now() |> DateTime.add(7 * 24 * 60 * 60, :second)
+        })
+        |> Slap.Repo.insert()
 
       assigns = %{
         id: "test-dm",
@@ -352,11 +363,12 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
       admin = user_fixture()
       member = user_fixture()
 
-      {:ok, conversation} = Slap.DirectMessaging.create_group_conversation(
-        %{title: "Event Test Group"},
-        [admin, member],
-        admin
-      )
+      {:ok, conversation} =
+        Slap.DirectMessaging.create_group_conversation(
+          %{title: "Event Test Group"},
+          [admin, member],
+          admin
+        )
 
       %{
         admin: admin,
@@ -435,7 +447,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        show_group_settings: true, # Show settings panel
+        # Show settings panel
+        show_group_settings: true,
         show_participants: false,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
@@ -466,7 +479,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         loading: false,
         message_form: to_form(%{"body" => ""}),
         show_group_settings: false,
-        show_participants: true, # Show participants panel
+        # Show participants panel
+        show_participants: true,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
       }
@@ -475,7 +489,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
 
       # Check for participants panel and admin controls
       assert html =~ "Participants"
-      assert html =~ "phx-change=\"promote_participant\""  # Admin should see role management
+      # Admin should see role management
+      assert html =~ "phx-change=\"promote_participant\""
       # Note: The invitation form may not be visible due to permission checks in the component
     end
 
@@ -496,7 +511,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         loading: false,
         message_form: to_form(%{"body" => ""}),
         show_group_settings: false,
-        show_participants: true, # Show participants panel
+        # Show participants panel
+        show_participants: true,
         current_user_role: "admin",
         myself: %Phoenix.LiveComponent.CID{cid: 1}
       }
@@ -520,16 +536,17 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
 
       # For testing purposes, we'll create the invitation directly in the database
       # to bypass the permission validation issue
-      {:ok, _invite} = %Slap.Chat.ConversationInvite{}
-      |> Slap.Chat.ConversationInvite.changeset(%{
-        conversation_id: conversation.id,
-        inviter_id: admin.id,
-        invitee_id: new_user.id,
-        token: "test-token-#{System.unique_integer([:positive])}",
-        status: "pending",
-        expires_at: DateTime.utc_now() |> DateTime.add(7 * 24 * 60 * 60, :second)
-      })
-      |> Slap.Repo.insert()
+      {:ok, _invite} =
+        %Slap.Chat.ConversationInvite{}
+        |> Slap.Chat.ConversationInvite.changeset(%{
+          conversation_id: conversation.id,
+          inviter_id: admin.id,
+          invitee_id: new_user.id,
+          token: "test-token-#{System.unique_integer([:positive])}",
+          status: "pending",
+          expires_at: DateTime.utc_now() |> DateTime.add(7 * 24 * 60 * 60, :second)
+        })
+        |> Slap.Repo.insert()
 
       assigns = %{
         id: "test-dm",
@@ -559,11 +576,12 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
       member = user_fixture()
       other_member = user_fixture()
 
-      {:ok, conversation} = Slap.DirectMessaging.create_group_conversation(
-        %{title: "Error Test Group"},
-        [member, other_member],
-        member
-      )
+      {:ok, conversation} =
+        Slap.DirectMessaging.create_group_conversation(
+          %{title: "Error Test Group"},
+          [member, other_member],
+          member
+        )
 
       %{
         member: member,
@@ -587,7 +605,8 @@ defmodule SlapWeb.DirectMessagingComponentGroupTest do
         unread_count: 0,
         loading: false,
         message_form: to_form(%{"body" => ""}),
-        show_group_settings: false, # Don't show settings panel for member
+        # Don't show settings panel for member
+        show_group_settings: false,
         show_participants: true,
         current_user_role: "member",
         myself: %Phoenix.LiveComponent.CID{cid: 1}

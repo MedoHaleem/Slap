@@ -12,12 +12,7 @@ defmodule SlapWeb.DirectMessaging.MessageFormComponent do
   def render(assigns) do
     ~H"""
     <div class="border-t border-gray-200 bg-white p-4">
-      <.form
-        for={@message_form}
-        phx-submit="send_message"
-        phx-target={@myself}
-        class="flex space-x-4"
-      >
+      <.form for={@message_form} phx-submit="send_message" phx-target={@myself} class="flex space-x-4">
         <input
           type="text"
           name="message[body]"

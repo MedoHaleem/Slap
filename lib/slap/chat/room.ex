@@ -2,7 +2,18 @@ defmodule Slap.Chat.Room do
   use Ecto.Schema
   import Ecto.Changeset
   alias Slap.Accounts.User
-  alias Slap.Chat.RoomMembership
+  alias Slap.Chat.{Message, RoomMembership}
+
+  @type t :: %__MODULE__{
+          id: integer(),
+          name: String.t(),
+          topic: String.t() | nil,
+          members: [User.t()] | Ecto.Association.NotLoaded.t(),
+          memberships: [RoomMembership.t()] | Ecto.Association.NotLoaded.t(),
+          messages: [Message.t()] | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
 
   schema "rooms" do
     field :name, :string

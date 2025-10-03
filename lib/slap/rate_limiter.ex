@@ -10,10 +10,10 @@ defmodule Slap.RateLimiter do
   @type limit_key :: any()
   @type limit_result :: :ok | {:error, :rate_limited}
   @type limit_options :: [
-    max_requests: non_neg_integer(),
-    window_size: non_neg_integer(),
-    key_prefix: String.t()
-  ]
+          max_requests: non_neg_integer(),
+          window_size: non_neg_integer(),
+          key_prefix: String.t()
+        ]
 
   # Default ETS table name
   @table_name :slap_rate_limits
@@ -77,12 +77,12 @@ defmodule Slap.RateLimiter do
   Returns a map with count, remaining, and reset_time.
   """
   @spec get_rate_limit_status(limit_key(), atom()) :: %{
-    count: non_neg_integer(),
-    remaining: non_neg_integer(),
-    reset_time: non_neg_integer() | nil,
-    max_requests: non_neg_integer(),
-    window_size: non_neg_integer()
-  }
+          count: non_neg_integer(),
+          remaining: non_neg_integer(),
+          reset_time: non_neg_integer() | nil,
+          max_requests: non_neg_integer(),
+          window_size: non_neg_integer()
+        }
   def get_rate_limit_status(key, action) do
     ensure_table_exists()
 
@@ -171,7 +171,8 @@ defmodule Slap.RateLimiter do
 
     expired_entries =
       Enum.filter(all_entries, fn {_key, _count, window_start} ->
-        now - window_start > Constants.rate_limit_window() * 2 # Cleanup entries older than 2x max window
+        # Cleanup entries older than 2x max window
+        now - window_start > Constants.rate_limit_window() * 2
       end)
 
     # Delete expired entries
@@ -186,10 +187,10 @@ defmodule Slap.RateLimiter do
   Gets statistics about rate limiting.
   """
   @spec get_stats() :: %{
-    total_entries: non_neg_integer(),
-    active_entries: non_neg_integer(),
-    memory_usage: non_neg_integer()
-  }
+          total_entries: non_neg_integer(),
+          active_entries: non_neg_integer(),
+          memory_usage: non_neg_integer()
+        }
   def get_stats() do
     ensure_table_exists()
 
@@ -216,6 +217,7 @@ defmodule Slap.RateLimiter do
     case :ets.whereis(@table_name) do
       :undefined ->
         :ets.new(@table_name, [:set, :public, :named_table, {:read_concurrency, true}])
+
       _ ->
         :ok
     end
@@ -224,22 +226,32 @@ defmodule Slap.RateLimiter do
   defp get_max_requests(action) do
     case action do
       :send_message -> Constants.rate_limit_max_messages()
-      :login_attempt -> 5 # 5 login attempts per window
-      :create_conversation -> 10 # 10 conversations per hour
-      :upload_file -> 20 # 20 files per hour
-      :search -> 100 # 100 searches per hour
-      _ -> Constants.rate_limit_max_messages() # Default to message rate limit
+      # 5 login attempts per window
+      :login_attempt -> 5
+      # 10 conversations per hour
+      :create_conversation -> 10
+      # 20 files per hour
+      :upload_file -> 20
+      # 100 searches per hour
+      :search -> 100
+      # Default to message rate limit
+      _ -> Constants.rate_limit_max_messages()
     end
   end
 
   defp get_window_size(action) do
     case action do
       :send_message -> Constants.rate_limit_window()
-      :login_attempt -> 15 * 60 * 1000 # 15 minutes
-      :create_conversation -> 60 * 60 * 1000 # 1 hour
-      :upload_file -> 60 * 60 * 1000 # 1 hour
-      :search -> 60 * 60 * 1000 # 1 hour
-      _ -> Constants.rate_limit_window() # Default to message rate limit window
+      # 15 minutes
+      :login_attempt -> 15 * 60 * 1000
+      # 1 hour
+      :create_conversation -> 60 * 60 * 1000
+      # 1 hour
+      :upload_file -> 60 * 60 * 1000
+      # 1 hour
+      :search -> 60 * 60 * 1000
+      # Default to message rate limit window
+      _ -> Constants.rate_limit_window()
     end
   end
 

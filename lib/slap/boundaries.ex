@@ -53,8 +53,13 @@ defmodule Slap.Boundaries do
     %{
       accounts: [:users, :sessions],
       chat: [:rooms, :messages, :replies, :reactions, :room_memberships, :message_attachments],
-      direct_messaging: [:conversations, :direct_messages, :conversation_participants,
-                        :conversation_invites, :conversation_settings],
+      direct_messaging: [
+        :conversations,
+        :direct_messages,
+        :conversation_participants,
+        :conversation_invites,
+        :conversation_settings
+      ],
       uploads: [:files]
     }
   end
@@ -74,22 +79,58 @@ defmodule Slap.Boundaries do
   def public_apis do
     %{
       accounts: %{
-        users: [:get_user, :get_user_by_username, :create_user, :update_user, :delete_user, :authenticate_user],
+        users: [
+          :get_user,
+          :get_user_by_username,
+          :create_user,
+          :update_user,
+          :delete_user,
+          :authenticate_user
+        ],
         sessions: [:create_session, :delete_session, :get_session]
       },
       chat: %{
-        rooms: [:list_rooms, :get_room, :create_room, :update_room, :delete_room, :join_room, :leave_room],
-        messages: [:list_messages, :get_message, :create_message, :update_message, :delete_message],
+        rooms: [
+          :list_rooms,
+          :get_room,
+          :create_room,
+          :update_room,
+          :delete_room,
+          :join_room,
+          :leave_room
+        ],
+        messages: [
+          :list_messages,
+          :get_message,
+          :create_message,
+          :update_message,
+          :delete_message
+        ],
         reactions: [:add_reaction, :remove_reaction],
         replies: [:create_reply, :update_reply, :delete_reply]
       },
       direct_messaging: %{
-        conversations: [:list_conversations, :get_conversation, :create_conversation, :update_conversation,
-                         :delete_conversation, :get_conversation_between_users],
-        messages: [:list_direct_messages, :get_direct_message, :send_direct_message, :update_direct_message,
-                  :delete_direct_message],
+        conversations: [
+          :list_conversations,
+          :get_conversation,
+          :create_conversation,
+          :update_conversation,
+          :delete_conversation,
+          :get_conversation_between_users
+        ],
+        messages: [
+          :list_direct_messages,
+          :get_direct_message,
+          :send_direct_message,
+          :update_direct_message,
+          :delete_direct_message
+        ],
         participants: [:add_participant, :remove_participant, :promote_participant],
-        invitations: [:create_conversation_invite, :accept_conversation_invite, :decline_conversation_invite]
+        invitations: [
+          :create_conversation_invite,
+          :accept_conversation_invite,
+          :decline_conversation_invite
+        ]
       },
       uploads: %{
         files: [:upload_file, :delete_file, :get_file]
@@ -104,7 +145,9 @@ defmodule Slap.Boundaries do
     apis = public_apis()
 
     case Map.get(apis, context) do
-      nil -> false
+      nil ->
+        false
+
       context_modules ->
         case Map.get(context_modules, module) do
           nil -> false
@@ -120,11 +163,31 @@ defmodule Slap.Boundaries do
   def event_publishing do
     %{
       accounts: [:user_created, :user_updated, :user_deleted, :user_signed_in, :user_signed_out],
-      chat: [:room_created, :room_updated, :room_deleted, :message_created, :message_updated, :message_deleted,
-             :reaction_added, :reaction_removed, :reply_created, :reply_deleted],
-      direct_messaging: [:conversation_created, :conversation_updated, :conversation_deleted, :message_sent,
-                        :message_updated, :message_deleted, :participant_added, :participant_removed,
-                        :invitation_sent, :invitation_accepted, :invitation_declined],
+      chat: [
+        :room_created,
+        :room_updated,
+        :room_deleted,
+        :message_created,
+        :message_updated,
+        :message_deleted,
+        :reaction_added,
+        :reaction_removed,
+        :reply_created,
+        :reply_deleted
+      ],
+      direct_messaging: [
+        :conversation_created,
+        :conversation_updated,
+        :conversation_deleted,
+        :message_sent,
+        :message_updated,
+        :message_deleted,
+        :participant_added,
+        :participant_removed,
+        :invitation_sent,
+        :invitation_accepted,
+        :invitation_declined
+      ],
       uploads: [:file_uploaded, :file_deleted]
     }
   end

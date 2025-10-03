@@ -22,6 +22,18 @@ defmodule Slap.ErrorHandler do
       {:error, %Ecto.Changeset{} = changeset} ->
         normalize_changeset_error(changeset)
 
+      {:error, :authorization, message, context} ->
+        {:error, :authorization, message, context}
+
+      {:error, :not_found, message, context} ->
+        {:error, :not_found, message, context}
+
+      {:error, :rate_limit, message, context} ->
+        {:error, :rate_limit, message, context}
+
+      {:error, :network, message, context} ->
+        {:error, :network, message, context}
+
       {:error, reason} when is_binary(reason) ->
         {:error, :server, reason, %{}}
 
@@ -47,11 +59,12 @@ defmodule Slap.ErrorHandler do
   """
   @spec normalize_changeset_error(Ecto.Changeset.t()) :: error_result()
   def normalize_changeset_error(changeset) do
-    errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
+    errors =
+      Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+        Enum.reduce(opts, msg, fn {key, value}, acc ->
+          String.replace(acc, "%{#{key}}", to_string(value))
+        end)
       end)
-    end)
 
     # Get the first error for simplicity, or join all errors
     error_message =
@@ -139,14 +152,15 @@ defmodule Slap.ErrorHandler do
   """
   @spec format_flash_error(error_result()) :: {atom(), String.t()}
   def format_flash_error({:error, type, message, _context}) do
-    flash_type = case type do
-      :validation -> :error
-      :authorization -> :error
-      :not_found -> :error
-      :rate_limit -> :error
-      :server -> :error
-      :network -> :error
-    end
+    flash_type =
+      case type do
+        :validation -> :error
+        :authorization -> :error
+        :not_found -> :error
+        :rate_limit -> :error
+        :server -> :error
+        :network -> :error
+      end
 
     {flash_type, message}
   end
@@ -156,18 +170,21 @@ defmodule Slap.ErrorHandler do
   """
   @spec format_log_error(error_result(), keyword()) :: String.t()
   def format_log_error({:error, type, message, context}, opts \\ []) do
-    context_str = if map_size(context) > 0 do
-      " Context: #{inspect(context)}"
-    else
-      ""
-    end
+    context_str =
+      if map_size(context) > 0 do
+        " Context: #{inspect(context)}"
+      else
+        ""
+      end
 
     user_id = Keyword.get(opts, :user_id)
-    user_str = if user_id do
-      " User: #{user_id}"
-    else
-      ""
-    end
+
+    user_str =
+      if user_id do
+        " User: #{user_id}"
+      else
+        ""
+      end
 
     "[#{String.upcase(Atom.to_string(type))}] #{message}#{context_str}#{user_str}"
   end
@@ -203,7 +220,7 @@ defmodule Slap.ErrorHandler do
   @doc """
   Wraps a function with error handling.
   """
-  @spec with_error_handling((() -> any()), keyword()) :: {:ok, any()} | error_result()
+  @spec with_error_handling((-> any()), keyword()) :: {:ok, any()} | error_result()
   def with_error_handling(fun, opts \\ []) do
     try do
       case fun.() do
@@ -241,8 +258,10 @@ defmodule Slap.ErrorHandler do
   def recoverable?({:error, type, _message, _context}) do
     case type do
       :network -> true
-      :server -> true  # Some server errors might be recoverable
-      :rate_limit -> true  # Can retry after waiting
+      # Some server errors might be recoverable
+      :server -> true
+      # Can retry after waiting
+      :rate_limit -> true
       _ -> false
     end
   end
@@ -253,9 +272,12 @@ defmodule Slap.ErrorHandler do
   @spec retry_delay(error_result()) :: non_neg_integer()
   def retry_delay({:error, type, _message, _context}) do
     case type do
-      :rate_limit -> 5_000  # 5 seconds
-      :network -> 1_000   # 1 second
-      :server -> 10_000  # 10 seconds
+      # 5 seconds
+      :rate_limit -> 5_000
+      # 1 second
+      :network -> 1_000
+      # 10 seconds
+      :server -> 10_000
       _ -> 0
     end
   end
@@ -265,13 +287,15 @@ defmodule Slap.ErrorHandler do
   defp log_error(error, opts) do
     require Logger
 
-    log_level = case error do
-      {:error, :validation, _, _} -> :warning
-      {:error, :authorization, _, _} -> :warning
-      {:error, :not_found, _, _} -> :info
-      {:error, :rate_limit, _, _} -> :warning
-      _ -> :error
-    end
+    log_level =
+      case error do
+        {:error, :validation, _, _} -> :warning
+        {:error, :authorization, _, _} -> :warning
+        {:error, :not_found, _, _} -> :info
+        {:error, :rate_limit, _, _} -> :warning
+        {:error, :server, _, _} -> :error
+        {:error, :network, _, _} -> :error
+      end
 
     Logger.log(log_level, format_log_error(error, opts))
   end

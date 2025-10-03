@@ -6,6 +6,19 @@ defmodule Slap.Chat.Reaction do
   alias Slap.Chat.Message
   alias Slap.Chat.DirectMessage
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          emoji: String.t(),
+          user_id: integer(),
+          message_id: integer() | nil,
+          direct_message_id: integer() | nil,
+          user: User.t() | Ecto.Association.NotLoaded.t(),
+          message: Message.t() | Ecto.Association.NotLoaded.t(),
+          direct_message: DirectMessage.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "reactions" do
     field :emoji, :string
     belongs_to :user, User

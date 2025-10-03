@@ -35,7 +35,9 @@ defmodule SlapWeb.DirectMessaging.ParticipantListComponent do
                   phx-target={@myself}
                 >
                   <option value="member" selected={participant.role == "member"}>Member</option>
-                  <option value="moderator" selected={participant.role == "moderator"}>Moderator</option>
+                  <option value="moderator" selected={participant.role == "moderator"}>
+                    Moderator
+                  </option>
                   <option value="admin" selected={participant.role == "admin"}>Admin</option>
                 </select>
               </div>
@@ -67,17 +69,24 @@ defmodule SlapWeb.DirectMessaging.ParticipantListComponent do
     current_user = socket.assigns.current_user
     conversation = socket.assigns.conversation
 
-    case Slap.DirectMessaging.promote_participant(conversation, String.to_integer(user_id), new_role, current_user) do
+    case Slap.DirectMessaging.promote_participant(
+           conversation,
+           String.to_integer(user_id),
+           new_role,
+           current_user
+         ) do
       {:ok, _participant} ->
         # Refresh conversation participants
-        updated_conversation = Slap.DirectMessaging.get_conversation!(conversation.id)
-        |> Slap.Repo.preload(conversation_participants: :user)
+        updated_conversation =
+          Slap.DirectMessaging.get_conversation!(conversation.id)
+          |> Slap.Repo.preload(conversation_participants: :user)
 
         send(self(), {:participants_updated, updated_conversation})
         {:noreply, socket}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, Constants.get_error_message(:participant_promotion_failed))}
+      {:error, _reason} ->
+        {:noreply,
+         put_flash(socket, :error, Constants.get_error_message(:participant_promotion_failed))}
     end
   end
 
@@ -86,12 +95,17 @@ defmodule SlapWeb.DirectMessaging.ParticipantListComponent do
     current_user = socket.assigns.current_user
     conversation = socket.assigns.conversation
 
-    case Slap.DirectMessaging.create_conversation_invite(conversation, String.to_integer(invitee_id), current_user) do
+    case Slap.DirectMessaging.create_conversation_invite(
+           conversation,
+           String.to_integer(invitee_id),
+           current_user
+         ) do
       {:ok, _invite} ->
         {:noreply, put_flash(socket, :info, Constants.get_success_message(:invitation_sent))}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, Constants.get_error_message(:invitation_send_failed))}
+      {:error, _reason} ->
+        {:noreply,
+         put_flash(socket, :error, Constants.get_error_message(:invitation_send_failed))}
     end
   end
 end

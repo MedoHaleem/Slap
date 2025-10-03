@@ -12,6 +12,7 @@ defmodule Slap.QueryBuilder do
   @spec messages_query(keyword()) :: Ecto.Query.t()
   def messages_query(opts \\ []) do
     schema = opts[:schema] || Slap.Chat.Message
+
     from(m in schema)
     |> maybe_filter_by_room(opts[:room_id])
     |> maybe_filter_by_conversation(opts[:conversation_id])
@@ -96,7 +97,11 @@ defmodule Slap.QueryBuilder do
   """
   @spec presence_query(keyword()) :: Ecto.Query.t()
   def presence_query(opts \\ []) do
-    from(p in SlapWeb.Presence)
+    # Note: SlapWeb.Presence is not an Ecto schema, this query is for illustration only
+    # In practice, presence data is handled by Phoenix.PubSub presence tracking
+    # from(p in "presences") # This would be a custom table if needed
+    # Since presence is not a schema, we'll return an empty query for now
+    from(p in "presences")
     |> maybe_filter_by_user(opts[:user_id])
     |> maybe_filter_by_topic(opts[:topic])
     |> maybe_filter_by_online_status(opts[:online_only])
@@ -105,8 +110,8 @@ defmodule Slap.QueryBuilder do
   @doc """
   Builds a query for user statistics.
   """
-  @spec user_stats_query(non_neg_integer(), keyword()) :: Ecto.Query.t()
-  def user_stats_query(user_id, opts \\ []) do
+  @spec user_stats_query(non_neg_integer(), keyword()) :: map()
+  def user_stats_query(user_id, _opts \\ []) do
     message_count_query =
       from(m in Slap.Chat.Message,
         where: m.user_id == ^user_id,
@@ -203,32 +208,41 @@ defmodule Slap.QueryBuilder do
   defp maybe_filter_by_room(query, room_id), do: where(query, [m], m.room_id == ^room_id)
 
   defp maybe_filter_by_conversation(query, nil), do: query
-  defp maybe_filter_by_conversation(query, conversation_id), do: where(query, [m], m.conversation_id == ^conversation_id)
+
+  defp maybe_filter_by_conversation(query, conversation_id),
+    do: where(query, [m], m.conversation_id == ^conversation_id)
 
   defp maybe_filter_by_user(query, nil), do: query
   defp maybe_filter_by_user(query, user_id), do: where(query, [m], m.user_id == ^user_id)
 
   defp maybe_filter_by_date_range(query, nil, nil), do: query
-  defp maybe_filter_by_date_range(query, start_date, nil), do: where(query, [m], m.inserted_at >= ^start_date)
-  defp maybe_filter_by_date_range(query, nil, end_date), do: where(query, [m], m.inserted_at <= ^end_date)
-  defp maybe_filter_by_date_range(query, start_date, end_date), do: where(query, [m], m.inserted_at >= ^start_date and m.inserted_at <= ^end_date)
 
-  defp maybe_include_reactions(query, true), do: preload(query, reactions: ^from(r in Slap.Chat.Reaction, order_by: [asc: r.id]))
+  defp maybe_filter_by_date_range(query, start_date, nil),
+    do: where(query, [m], m.inserted_at >= ^start_date)
+
+  defp maybe_filter_by_date_range(query, nil, end_date),
+    do: where(query, [m], m.inserted_at <= ^end_date)
+
+  defp maybe_filter_by_date_range(query, start_date, end_date),
+    do: where(query, [m], m.inserted_at >= ^start_date and m.inserted_at <= ^end_date)
+
+  defp maybe_include_reactions(query, true),
+    do: preload(query, reactions: ^from(r in Slap.Chat.Reaction, order_by: [asc: r.id]))
+
   defp maybe_include_reactions(query, _), do: query
 
   defp maybe_include_attachments(query, true), do: preload(query, :attachments)
   defp maybe_include_attachments(query, _), do: query
 
-  defp maybe_include_replies(query, true), do: preload(query, replies: ^from(r in Slap.Chat.Reply, order_by: [asc: r.id]))
+  defp maybe_include_replies(query, true),
+    do: preload(query, replies: ^from(r in Slap.Chat.Reply, order_by: [asc: r.id]))
+
   defp maybe_include_replies(query, _), do: query
 
   defp maybe_include_user(query, true), do: preload(query, :user)
   defp maybe_include_user(query, _), do: query
 
   defp maybe_order_by(query, order_by), do: order_by(query, ^order_by)
-
-  defp maybe_filter_by_user(query, nil), do: query
-  defp maybe_filter_by_user(query, user_id), do: where(query, [p], p.user_id == ^user_id)
 
   defp maybe_filter_by_topic(query, nil), do: query
   defp maybe_filter_by_topic(query, topic), do: where(query, [p], p.topic == ^topic)

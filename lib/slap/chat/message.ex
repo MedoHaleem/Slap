@@ -5,6 +5,20 @@ defmodule Slap.Chat.Message do
   alias Slap.Accounts.User
   alias Slap.Chat.{Reply, Room, Reaction, MessageAttachment}
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          body: String.t(),
+          room_id: integer(),
+          user_id: integer(),
+          room: Room.t() | Ecto.Association.NotLoaded.t(),
+          user: User.t() | Ecto.Association.NotLoaded.t(),
+          replies: [Reply.t()] | Ecto.Association.NotLoaded.t(),
+          reactions: [Reaction.t()] | Ecto.Association.NotLoaded.t(),
+          attachments: [MessageAttachment.t()] | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "messages" do
     field :body, :string
     belongs_to :room, Room

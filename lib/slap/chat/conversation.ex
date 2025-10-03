@@ -2,10 +2,36 @@ defmodule Slap.Chat.Conversation do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Slap.Chat.{DirectMessage, ConversationParticipant, ConversationSetting, ConversationInvite}
+  alias Slap.Chat.{
+    DirectMessage,
+    ConversationParticipant,
+    ConversationSetting,
+    ConversationInvite
+  }
 
   @conversation_types ["direct", "group", "channel"]
   @max_participants 1000
+
+  @type t :: %__MODULE__{
+          id: integer(),
+          title: String.t(),
+          description: String.t() | nil,
+          last_message_at: DateTime.t() | nil,
+          participant_count: integer(),
+          type: String.t(),
+          is_public: boolean(),
+          avatar_path: String.t() | nil,
+          settings: map(),
+          current_user_role: String.t() | nil,
+          unread_count: integer(),
+          conversation_participants:
+            [ConversationParticipant.t()] | Ecto.Association.NotLoaded.t(),
+          direct_messages: [DirectMessage.t()] | Ecto.Association.NotLoaded.t(),
+          conversation_setting: ConversationSetting.t() | Ecto.Association.NotLoaded.t(),
+          conversation_invites: [ConversationInvite.t()] | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
 
   schema "conversations" do
     field :title, :string
@@ -32,7 +58,15 @@ defmodule Slap.Chat.Conversation do
   @doc false
   def changeset(conversation, attrs) do
     conversation
-    |> cast(attrs, [:title, :description, :last_message_at, :type, :is_public, :avatar_path, :settings])
+    |> cast(attrs, [
+      :title,
+      :description,
+      :last_message_at,
+      :type,
+      :is_public,
+      :avatar_path,
+      :settings
+    ])
     |> validate_required([:title, :type])
     |> validate_length(:title, max: 255)
     |> validate_length(:description, max: 1000)
@@ -48,7 +82,9 @@ defmodule Slap.Chat.Conversation do
           "direct" -> changeset
           _ -> put_change(changeset, :title, "New Group Conversation")
         end
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
 

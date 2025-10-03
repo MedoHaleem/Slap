@@ -4,7 +4,6 @@ defmodule Slap.DirectMessagingGroupTest do
   alias Slap.DirectMessaging
 
   import Slap.AccountsFixtures
-  import Slap.DirectMessagingFixtures
 
   describe "group conversations" do
     setup do
@@ -14,14 +13,16 @@ defmodule Slap.DirectMessagingGroupTest do
       member2 = user_fixture()
 
       # Create a group conversation
-      {:ok, conversation} = DirectMessaging.create_group_conversation(
-        %{title: "Test Group", is_public: false},
-        [admin, moderator, member1],
-        admin
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Test Group", is_public: false},
+          [admin, moderator, member1],
+          admin
+        )
 
       # Set moderator role
-      {:ok, _} = DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
+      {:ok, _} =
+        DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
 
       %{
         admin: admin,
@@ -54,11 +55,13 @@ defmodule Slap.DirectMessagingGroupTest do
     end
 
     test "create_group_conversation/3 validates minimum participants", %{admin: admin} do
-      result = DirectMessaging.create_group_conversation(
-        %{title: "Invalid Group"},
-        [admin], # Only 1 participant
-        admin
-      )
+      result =
+        DirectMessaging.create_group_conversation(
+          %{title: "Invalid Group"},
+          # Only 1 participant
+          [admin],
+          admin
+        )
 
       # Should return an error
       assert match?({:error, _}, result)
@@ -69,11 +72,12 @@ defmodule Slap.DirectMessagingGroupTest do
       # Use default user fixture which generates unique usernames
       participants = for _i <- 1..1001, do: user_fixture()
 
-      result = DirectMessaging.create_group_conversation(
-        %{title: "Too Large Group"},
-        participants,
-        admin
-      )
+      result =
+        DirectMessaging.create_group_conversation(
+          %{title: "Too Large Group"},
+          participants,
+          admin
+        )
 
       # Should return an error
       assert match?({:error, _}, result)
@@ -83,11 +87,12 @@ defmodule Slap.DirectMessagingGroupTest do
       admin: admin,
       member1: member1
     } do
-      {:ok, conversation} = DirectMessaging.create_direct_message_conversation(
-        %{title: "Direct Message"},
-        admin,
-        member1
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_direct_message_conversation(
+          %{title: "Direct Message"},
+          admin,
+          member1
+        )
 
       assert conversation.type == "direct"
       assert length(conversation.conversation_participants) == 2
@@ -104,15 +109,18 @@ defmodule Slap.DirectMessagingGroupTest do
       moderator = user_fixture()
       member = user_fixture()
 
-      {:ok, conversation} = DirectMessaging.create_group_conversation(
-        %{title: "Role Test Group"},
-        [admin, moderator, member],
-        admin
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Role Test Group"},
+          [admin, moderator, member],
+          admin
+        )
 
       # Set moderator role - need to reload conversation with participants
       conversation = Slap.Repo.preload(conversation, conversation_participants: :user)
-      {:ok, _} = DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
+
+      {:ok, _} =
+        DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
 
       %{
         admin: admin,
@@ -128,10 +136,17 @@ defmodule Slap.DirectMessagingGroupTest do
       member: member,
       conversation: conversation
     } do
-      assert {:ok, "admin"} == DirectMessaging.get_user_role_in_conversation(conversation.id, admin.id)
-      assert {:ok, "moderator"} == DirectMessaging.get_user_role_in_conversation(conversation.id, moderator.id)
-      assert {:ok, "member"} == DirectMessaging.get_user_role_in_conversation(conversation.id, member.id)
-      assert {:error, "User is not a participant in this conversation"} == DirectMessaging.get_user_role_in_conversation(conversation.id, -1)
+      assert {:ok, "admin"} ==
+               DirectMessaging.get_user_role_in_conversation(conversation.id, admin.id)
+
+      assert {:ok, "moderator"} ==
+               DirectMessaging.get_user_role_in_conversation(conversation.id, moderator.id)
+
+      assert {:ok, "member"} ==
+               DirectMessaging.get_user_role_in_conversation(conversation.id, member.id)
+
+      assert {:error, "User is not a participant in this conversation"} ==
+               DirectMessaging.get_user_role_in_conversation(conversation.id, -1)
     end
 
     test "user_has_permission?/3 validates permissions correctly", %{
@@ -158,12 +173,13 @@ defmodule Slap.DirectMessagingGroupTest do
       member: member,
       conversation: conversation
     } do
-      {:ok, updated_participant} = DirectMessaging.promote_participant(
-        conversation,
-        member.id,
-        "moderator",
-        admin
-      )
+      {:ok, updated_participant} =
+        DirectMessaging.promote_participant(
+          conversation,
+          member.id,
+          "moderator",
+          admin
+        )
 
       assert updated_participant.role == "moderator"
     end
@@ -173,12 +189,13 @@ defmodule Slap.DirectMessagingGroupTest do
       member: member,
       conversation: conversation
     } do
-      {:error, reason} = DirectMessaging.promote_participant(
-        conversation,
-        member.id,
-        "moderator",
-        moderator
-      )
+      {:error, reason} =
+        DirectMessaging.promote_participant(
+          conversation,
+          member.id,
+          "moderator",
+          moderator
+        )
 
       assert reason == "Only admins can promote participants"
     end
@@ -189,12 +206,14 @@ defmodule Slap.DirectMessagingGroupTest do
       conversation: conversation
     } do
       # Cannot promote to same or lower role
-      {:error, reason} = DirectMessaging.promote_participant(
-        conversation,
-        member.id,
-        "member", # Same role
-        admin
-      )
+      {:error, reason} =
+        DirectMessaging.promote_participant(
+          conversation,
+          member.id,
+          # Same role
+          "member",
+          admin
+        )
 
       assert reason == "Cannot promote to same or lower role"
     end
@@ -206,11 +225,12 @@ defmodule Slap.DirectMessagingGroupTest do
       inviter = user_fixture()
       invitee = user_fixture()
 
-      {:ok, conversation} = DirectMessaging.create_group_conversation(
-        %{title: "Invitation Test Group"},
-        [admin, inviter],
-        admin
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Invitation Test Group"},
+          [admin, inviter],
+          admin
+        )
 
       %{
         admin: admin,
@@ -278,10 +298,11 @@ defmodule Slap.DirectMessagingGroupTest do
     test "accept_conversation_invite/2 rejects invalid token", %{
       invitee: invitee
     } do
-      {:error, reason} = DirectMessaging.accept_conversation_invite(
-        "invalid-token",
-        invitee
-      )
+      {:error, reason} =
+        DirectMessaging.accept_conversation_invite(
+          "invalid-token",
+          invitee
+        )
 
       assert reason == "Invalid or expired invitation"
     end
@@ -293,15 +314,18 @@ defmodule Slap.DirectMessagingGroupTest do
       moderator = user_fixture()
       member = user_fixture()
 
-      {:ok, conversation} = DirectMessaging.create_group_conversation(
-        %{title: "Settings Test Group"},
-        [admin, moderator, member],
-        admin
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Settings Test Group"},
+          [admin, moderator, member],
+          admin
+        )
 
       # Set moderator role - need to reload conversation with participants
       conversation = Slap.Repo.preload(conversation, conversation_participants: :user)
-      {:ok, _} = DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
+
+      {:ok, _} =
+        DirectMessaging.promote_participant(conversation, moderator.id, "moderator", admin)
 
       %{
         admin: admin,
@@ -318,7 +342,8 @@ defmodule Slap.DirectMessagingGroupTest do
 
       assert settings.conversation_id == conversation.id
       assert settings.allow_participant_invites == true
-      assert settings.require_admin_approval == true # Group conversations default to true
+      # Group conversations default to true
+      assert settings.require_admin_approval == true
       assert settings.message_editing_enabled == true
       assert settings.file_sharing_enabled == true
       assert settings.max_participants == 100
@@ -328,11 +353,12 @@ defmodule Slap.DirectMessagingGroupTest do
       admin: admin,
       conversation: conversation
     } do
-      {:ok, updated_settings} = DirectMessaging.update_conversation_settings(
-        conversation,
-        %{allow_participant_invites: false, max_participants: 50},
-        admin
-      )
+      {:ok, updated_settings} =
+        DirectMessaging.update_conversation_settings(
+          conversation,
+          %{allow_participant_invites: false, max_participants: 50},
+          admin
+        )
 
       assert updated_settings.allow_participant_invites == false
       assert updated_settings.max_participants == 50
@@ -342,11 +368,12 @@ defmodule Slap.DirectMessagingGroupTest do
       moderator: moderator,
       conversation: conversation
     } do
-      {:ok, updated_settings} = DirectMessaging.update_conversation_settings(
-        conversation,
-        %{allow_participant_invites: false},
-        moderator
-      )
+      {:ok, updated_settings} =
+        DirectMessaging.update_conversation_settings(
+          conversation,
+          %{allow_participant_invites: false},
+          moderator
+        )
 
       assert updated_settings.allow_participant_invites == false
     end
@@ -355,11 +382,12 @@ defmodule Slap.DirectMessagingGroupTest do
       member: member,
       conversation: conversation
     } do
-      {:error, reason} = DirectMessaging.update_conversation_settings(
-        conversation,
-        %{allow_participant_invites: false},
-        member
-      )
+      {:error, reason} =
+        DirectMessaging.update_conversation_settings(
+          conversation,
+          %{allow_participant_invites: false},
+          member
+        )
 
       assert reason == "Insufficient permissions to update conversation settings"
     end
@@ -372,30 +400,35 @@ defmodule Slap.DirectMessagingGroupTest do
       user3 = user_fixture()
 
       # Create public groups - need at least 2 participants
-      {:ok, public_group1} = DirectMessaging.create_group_conversation(
-        %{title: "Public Group 1", is_public: true},
-        [user1, user_fixture()],
-        user1
-      )
+      {:ok, public_group1} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Public Group 1", is_public: true},
+          [user1, user_fixture()],
+          user1
+        )
 
-      {:ok, public_group2} = DirectMessaging.create_group_conversation(
-        %{title: "Public Group 2", is_public: true},
-        [user2, user_fixture()],
-        user2
-      )
+      {:ok, public_group2} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Public Group 2", is_public: true},
+          [user2, user_fixture()],
+          user2
+        )
 
       # Create private group - need at least 2 participants
       other_user = user_fixture()
-      {:ok, _private_group} = DirectMessaging.create_group_conversation(
-        %{title: "Private Group", is_public: false},
-        [user1, other_user],
-        user1
-      )
+
+      {:ok, _private_group} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Private Group", is_public: false},
+          [user1, other_user],
+          user1
+        )
 
       %{
         user1: user1,
         user2: user2,
-        user3: user3, # Not in any groups
+        # Not in any groups
+        user3: user3,
         public_group1: public_group1,
         public_group2: public_group2
       }
@@ -444,11 +477,13 @@ defmodule Slap.DirectMessagingGroupTest do
       for i <- 1..5 do
         user = user_fixture()
         other_user = user_fixture()
-        {:ok, _} = DirectMessaging.create_group_conversation(
-          %{title: "Public Group #{i}", is_public: true},
-          [user, other_user],
-          user
-        )
+
+        {:ok, _} =
+          DirectMessaging.create_group_conversation(
+            %{title: "Public Group #{i}", is_public: true},
+            [user, other_user],
+            user
+          )
       end
 
       public_groups = DirectMessaging.list_public_groups(user3, limit: 3)
@@ -462,18 +497,20 @@ defmodule Slap.DirectMessagingGroupTest do
       other_user = user_fixture()
 
       # Create direct conversation
-      {:ok, direct_conv} = DirectMessaging.create_direct_message_conversation(
-        %{title: "Direct Chat"},
-        user,
-        other_user
-      )
+      {:ok, direct_conv} =
+        DirectMessaging.create_direct_message_conversation(
+          %{title: "Direct Chat"},
+          user,
+          other_user
+        )
 
       # Create group conversation
-      {:ok, group_conv} = DirectMessaging.create_group_conversation(
-        %{title: "Test Group"},
-        [user, other_user],
-        user
-      )
+      {:ok, group_conv} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Test Group"},
+          [user, other_user],
+          user
+        )
 
       direct_conversations = DirectMessaging.list_user_conversations_by_type(user, "direct")
       group_conversations = DirectMessaging.list_user_conversations_by_type(user, "group")
@@ -493,11 +530,12 @@ defmodule Slap.DirectMessagingGroupTest do
       admin = user_fixture()
       member = user_fixture()
 
-      {:ok, conversation} = DirectMessaging.create_group_conversation(
-        %{title: "Participant Management Group"},
-        [admin, member],
-        admin
-      )
+      {:ok, conversation} =
+        DirectMessaging.create_group_conversation(
+          %{title: "Participant Management Group"},
+          [admin, member],
+          admin
+        )
 
       %{
         admin: admin,
@@ -512,10 +550,11 @@ defmodule Slap.DirectMessagingGroupTest do
     } do
       new_user = user_fixture()
 
-      {:ok, participant} = DirectMessaging.add_participant_to_conversation(
-        conversation,
-        new_user.id
-      )
+      {:ok, participant} =
+        DirectMessaging.add_participant_to_conversation(
+          conversation,
+          new_user.id
+        )
 
       assert participant.conversation_id == conversation.id
       assert participant.user_id == new_user.id
@@ -528,10 +567,11 @@ defmodule Slap.DirectMessagingGroupTest do
       conversation: conversation,
       member: member
     } do
-      {count, nil} = DirectMessaging.remove_participant_from_conversation(
-        conversation,
-        member.id
-      )
+      {count, nil} =
+        DirectMessaging.remove_participant_from_conversation(
+          conversation,
+          member.id
+        )
 
       assert count == 1
 

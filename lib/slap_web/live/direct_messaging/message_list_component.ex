@@ -11,10 +11,7 @@ defmodule SlapWeb.DirectMessaging.MessageListComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      class="dm-messages-container flex-1 overflow-y-auto p-4 space-y-4"
-      id="messages-container"
-    >
+    <div class="dm-messages-container flex-1 overflow-y-auto p-4 space-y-4" id="messages-container">
       <%= for message <- @messages do %>
         <.message_container>
           <.user_avatar user={message.user} size="normal" />

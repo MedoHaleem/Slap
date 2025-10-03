@@ -42,10 +42,12 @@ defmodule SlapWeb.DirectMessaging.GroupSettingsComponent do
           {:noreply, socket}
 
         {:error, _changeset} ->
-          {:noreply, put_flash(socket, :error, Constants.get_error_message(:conversation_update_failed))}
+          {:noreply,
+           put_flash(socket, :error, Constants.get_error_message(:conversation_update_failed))}
       end
     else
-      {:noreply, put_flash(socket, :error, Constants.get_error_message(:insufficient_permissions))}
+      {:noreply,
+       put_flash(socket, :error, Constants.get_error_message(:insufficient_permissions))}
     end
   end
 end

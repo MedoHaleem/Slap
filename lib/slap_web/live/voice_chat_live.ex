@@ -240,8 +240,7 @@ defmodule SlapWeb.VoiceChatLive do
 
     ~H"""
     <div class="relative min-h-screen bg-gray-100 flex flex-col w-full">
-      <.voice_header {assigns} />
-      <.main_content {assigns} />
+      <.voice_header {assigns} /> <.main_content {assigns} />
     </div>
     """
   end
@@ -261,6 +260,7 @@ defmodule SlapWeb.VoiceChatLive do
     ~H"""
     <div class="flex items-center">
       <h1 class="text-xl font-bold text-gray-800">Voice Chat</h1>
+      
       <div class="ml-3 text-sm text-gray-600">
         {chat_partner_text(@call_status, @caller, @target_user)}
       </div>
@@ -279,6 +279,7 @@ defmodule SlapWeb.VoiceChatLive do
           <.icon name="hero-phone-x-mark" class="h-5 w-5 mr-2" /> End Call
         </button>
       <% end %>
+      
       <button
         onclick="window.close()"
         class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
@@ -328,6 +329,7 @@ defmodule SlapWeb.VoiceChatLive do
       <div class={"w-32 h-32 rounded-full flex items-center justify-center mx-auto #{@bg_color}"}>
         <.icon name="hero-microphone" class="h-16 w-16 text-gray-500" />
       </div>
+      
       <%= if @call_status == "connected" do %>
         <div class="audio-wave mt-4">
           <span></span> <span></span> <span></span> <span></span> <span></span>
@@ -372,6 +374,7 @@ defmodule SlapWeb.VoiceChatLive do
             >
               <.icon name="hero-phone" class="h-5 w-5 mr-2" /> Accept
             </button>
+            
             <button
               phx-click="reject_call"
               class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full text-lg flex items-center"
@@ -392,6 +395,7 @@ defmodule SlapWeb.VoiceChatLive do
               <div class="mb-4 text-red-600 text-sm">
                 {String.replace_prefix(status, "error: ", "")}
               </div>
+              
               <button
                 phx-click="request_call"
                 class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg"

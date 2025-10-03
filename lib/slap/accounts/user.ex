@@ -4,6 +4,17 @@ defmodule Slap.Accounts.User do
 
   alias Slap.Chat.{Room, RoomMembership, Reaction}
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          email: String.t(),
+          username: String.t(),
+          hashed_password: String.t(),
+          confirmed_at: DateTime.t() | nil,
+          avatar_path: String.t() | nil,
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "users" do
     field :email, :string
     field :username, :string

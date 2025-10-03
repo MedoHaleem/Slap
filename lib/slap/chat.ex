@@ -1,7 +1,7 @@
 defmodule Slap.Chat do
   alias Slap.Accounts.User
   alias Slap.Chat.{Message, Room, RoomMembership, Reply, Reaction, MessageAttachment}
-  alias Slap.{Repo, Uploads, Constants, Authorization, RateLimiter, ErrorHandler, Pagination, QueryBuilder, Messaging}
+  alias Slap.{Repo, Uploads, Constants, QueryBuilder}
   import Ecto.Changeset
   import Ecto.Query
 
@@ -234,13 +234,14 @@ defmodule Slap.Chat do
 
   def list_messages_in_room(%Room{id: room_id}, opts \\ []) do
     # Use QueryBuilder to build the query
-    base_query = QueryBuilder.messages_query(
-      schema: Message,
-      room_id: room_id,
-      include_reactions: true,
-      include_attachments: true,
-      include_replies: true
-    )
+    base_query =
+      QueryBuilder.messages_query(
+        schema: Message,
+        room_id: room_id,
+        include_reactions: true,
+        include_attachments: true,
+        include_replies: true
+      )
 
     # Apply cursor-based pagination
     QueryBuilder.cursor_paginate_query(base_query, opts)
@@ -248,20 +249,20 @@ defmodule Slap.Chat do
 
   def search_messages(room_id, query, opts \\ []) do
     # Use QueryBuilder for search
-    base_query = QueryBuilder.messages_query(
-      schema: Message,
-      room_id: room_id,
-      include_reactions: true,
-      include_attachments: true,
-      include_replies: true
-    )
+    base_query =
+      QueryBuilder.messages_query(
+        schema: Message,
+        room_id: room_id,
+        include_reactions: true,
+        include_attachments: true,
+        include_replies: true
+      )
 
     search_query = QueryBuilder.search_query(base_query, query, search_field: :body)
     paginated_query = QueryBuilder.cursor_paginate_query(search_query, opts)
 
     # Execute the query and return results
     case paginated_query do
-      %{entries: entries} = query -> Repo.all(query)
       query when is_struct(query, Ecto.Query) -> Repo.all(query)
       other -> other
     end

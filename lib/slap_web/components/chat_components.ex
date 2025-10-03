@@ -92,9 +92,11 @@ defmodule SlapWeb.ChatComponents do
           </span>
 
           <div
-            :if={is_struct(@message, Message) &&
-                  not is_struct(@message.reactions, Ecto.Association.NotLoaded) &&
-                  Enum.any?(@message.reactions)}
+            :if={
+              is_struct(@message, Message) &&
+                not is_struct(@message.reactions, Ecto.Association.NotLoaded) &&
+                Enum.any?(@message.reactions)
+            }
             class="flex space-x-2 mt-2"
           >
             <%= for {emoji, count, me?} <- enumerate_reactions(@message.reactions, @current_user) do %>
@@ -145,9 +147,11 @@ defmodule SlapWeb.ChatComponents do
           </div>
 
           <div
-            :if={!@in_thread? &&
-                  not is_struct(@message.replies, Ecto.Association.NotLoaded) &&
-                  Enum.any?(@message.replies)}
+            :if={
+              !@in_thread? &&
+                not is_struct(@message.replies, Ecto.Association.NotLoaded) &&
+                Enum.any?(@message.replies)
+            }
             class="inline-flex items-center mt-2 rounded border border-transparent hover:border-slate-200 hover:bg-slate-50 py-1 pr-2 box-border cursor-pointer"
             phx-click="show-thread"
             phx-value-id={@message.id}

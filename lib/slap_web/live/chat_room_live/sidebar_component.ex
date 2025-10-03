@@ -42,12 +42,12 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
           </h1>
         </div>
       </div>
-
+      
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3">
           <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
         </div>
-
+        
         <div id="rooms-list">
           <.room_link
             :for={{room, unread_count} <- @rooms}
@@ -67,7 +67,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
                   >
                     Browse rooms
                   </div>
-
+                  
                   <div
                     phx-click={
                       JS.navigate(~p"/rooms/#{@current_room_id}/new") |> show_modal("new-room-modal")
@@ -81,7 +81,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             </div>
           </button>
         </div>
-
+        
         <div class="mt-4">
           <div class="flex items-center h-8 px-3">
             <.link
@@ -92,14 +92,14 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
               <span class="ml-2 leading-none font-medium text-sm">Search</span>
             </.link>
           </div>
-
+          
           <div class="flex items-center h-8 px-3 mt-1">
             <div class="flex items-center grow">
               <.toggler on_click={toggle_users()} dom_id="users-toggler" text="Users" />
               <.unread_message_counter count={@dm_unread_count || 0} />
             </div>
           </div>
-
+          
           <div id="users-list">
             <.user
               :for={user <- @users}
@@ -108,7 +108,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
               current_user={@current_user}
             />
           </div>
-
+          
           <div class="mt-2">
             <button class="group relative flex items-center h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full">
               <.icon name="hero-plus" class="h-4 w-4 relative top-px" />
@@ -122,7 +122,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
                     >
                       Browse groups
                     </div>
-
+                    
                     <div
                       phx-click="create-group"
                       class="block select-none cursor-pointer whitespace-nowrap text-gray-800 hover:text-white px-6 py-1 block hover:bg-sky-600"
@@ -190,7 +190,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
         </div>
          <span class="ml-2 leading-none">{@user.username}</span>
       </.link>
-
+      
       <div class="flex items-center space-x-2">
         <%= if @online && @user.id != @current_user.id do %>
           <a
@@ -202,7 +202,7 @@ defmodule SlapWeb.ChatRoomLive.SidebarComponent do
             <.icon name="hero-microphone" class="h-4 w-4 text-gray-600 hover:text-gray-800" />
           </a>
         <% end %>
-
+        
         <%= if @user.id != @current_user.id do %>
           <button
             phx-click="start-direct-message"

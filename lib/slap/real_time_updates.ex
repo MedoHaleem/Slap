@@ -87,10 +87,15 @@ defmodule Slap.RealTimeUpdates do
   defp get_message_container_id(_), do: nil
 
   defp mark_message_read(message, :room, user_id) do
-    Slap.Chat.update_last_read_id(%Slap.Chat.Room{id: message.room_id}, %Slap.Accounts.User{id: user_id})
+    Slap.Chat.update_last_read_id(%Slap.Chat.Room{id: message.room_id}, %Slap.Accounts.User{
+      id: user_id
+    })
   end
 
   defp mark_message_read(message, :conversation, user_id) do
-    Slap.DirectMessaging.mark_conversation_read(%Slap.Chat.Conversation{id: message.conversation_id}, %Slap.Accounts.User{id: user_id})
+    Slap.DirectMessaging.mark_conversation_read(
+      %Slap.Chat.Conversation{id: message.conversation_id},
+      %Slap.Accounts.User{id: user_id}
+    )
   end
 end

@@ -8,22 +8,25 @@ defmodule Slap.Pagination do
   import Ecto.Query
 
   @type pagination_options :: [
-    limit: non_neg_integer(),
-    before: non_neg_integer() | nil,
-    after: non_neg_integer() | nil,
-    cursor_field: atom()
-  ]
+          limit: non_neg_integer(),
+          before: non_neg_integer() | nil,
+          after: non_neg_integer() | nil,
+          cursor_field: atom()
+        ]
 
   @type pagination_result :: %{
-    entries: [any()],
-    metadata: %{
-      has_next: boolean(),
-      has_previous: boolean(),
-      next_cursor: non_neg_integer() | nil,
-      previous_cursor: non_neg_integer() | nil,
-      total_count: non_neg_integer() | nil
-    }
-  }
+          entries: [any()],
+          metadata: %{
+            has_next: boolean(),
+            has_previous: boolean(),
+            next_cursor: any() | nil,
+            previous_cursor: any() | nil,
+            total_count: non_neg_integer() | nil,
+            current_page: pos_integer() | nil,
+            total_pages: non_neg_integer() | nil,
+            page_size: pos_integer() | nil
+          }
+        }
 
   @doc """
   Applies cursor-based pagination to a query.
@@ -35,7 +38,7 @@ defmodule Slap.Pagination do
   - `:cursor_field` - Field to use for cursor (default: :inserted_at)
   - `:order_by` - Order direction (default: :desc)
   """
-  @spec paginate(Ecto.Query.t(), pagination_options()) :: pagination_result()
+  @spec paginate(Ecto.Query.t(), pagination_options()) :: %{entries: [any()], metadata: map()}
   def paginate(query, opts \\ []) do
     limit = Keyword.get(opts, :limit, Constants.default_page_size())
     cursor_before = Keyword.get(opts, :before)
@@ -52,6 +55,10 @@ defmodule Slap.Pagination do
     # Execute query
     entries = Slap.Repo.all(query)
 
+    # Check if we have more entries and adjust if needed
+    has_next = length(entries) > limit
+    entries = if has_next, do: Enum.take(entries, limit), else: entries
+
     # Build metadata
     metadata = build_pagination_metadata(entries, limit, cursor_field, order_by)
 
@@ -65,7 +72,10 @@ defmodule Slap.Pagination do
   Applies cursor-based pagination with total count.
   This includes an additional query to get the total count.
   """
-  @spec paginate_with_count(Ecto.Query.t(), pagination_options()) :: pagination_result()
+  @spec paginate_with_count(Ecto.Query.t(), pagination_options()) :: %{
+          entries: [any()],
+          metadata: map()
+        }
   def paginate_with_count(query, opts \\ []) do
     result = paginate(query, opts)
 
@@ -80,7 +90,7 @@ defmodule Slap.Pagination do
   @doc """
   Applies offset-based pagination (traditional page/limit).
   """
-  @spec paginate_offset(Ecto.Query.t(), non_neg_integer(), non_neg_integer()) :: pagination_result()
+  @spec paginate_offset(Ecto.Query.t(), pos_integer(), pos_integer()) :: pagination_result()
   def paginate_offset(query, page, page_size \\ Constants.default_page_size()) do
     offset = (page - 1) * page_size
 
@@ -193,7 +203,7 @@ defmodule Slap.Pagination do
     end
   end
 
-  defp get_cursor_value(query, cursor_id) do
+  defp get_cursor_value(_query, cursor_id) do
     # Get the actual cursor value from the database
     # This assumes cursor_id is the primary key
     # For timestamp cursors, you might need a different approach
@@ -203,27 +213,27 @@ defmodule Slap.Pagination do
     cursor_id
   end
 
-  defp build_pagination_metadata(entries, limit, cursor_field, order_by) do
+  defp build_pagination_metadata(entries, limit, cursor_field, _order_by) do
     has_next = length(entries) > limit
-    has_previous = false # Would need additional query to determine
-
-    # Remove the extra entry if we fetched one more to check for next page
-    entries = if has_next, do: Enum.take(entries, limit), else: entries
+    # Would need additional query to determine
+    has_previous = false
 
     # Get cursors from first and last entries
-    next_cursor = if has_next and entries != [] do
-      last_entry = List.last(entries)
-      create_cursor(last_entry, cursor_field)
-    else
-      nil
-    end
+    next_cursor =
+      if has_next and entries != [] do
+        last_entry = List.last(entries)
+        create_cursor(last_entry, cursor_field)
+      else
+        nil
+      end
 
-    previous_cursor = if entries != [] do
-      first_entry = List.first(entries)
-      create_cursor(first_entry, cursor_field)
-    else
-      nil
-    end
+    previous_cursor =
+      if entries != [] do
+        first_entry = List.first(entries)
+        create_cursor(first_entry, cursor_field)
+      else
+        nil
+      end
 
     %{
       has_next: has_next,

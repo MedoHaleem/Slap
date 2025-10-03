@@ -33,11 +33,12 @@ defmodule Slap.GroupConversationFixtures do
         is_public: false
       })
 
-    {:ok, conversation} = DirectMessaging.create_group_conversation(
-      conversation_attrs,
-      participants,
-      creator
-    )
+    {:ok, conversation} =
+      DirectMessaging.create_group_conversation(
+        conversation_attrs,
+        participants,
+        creator
+      )
 
     conversation
   end
@@ -73,9 +74,12 @@ defmodule Slap.GroupConversationFixtures do
   """
   def conversation_invite_fixture(attrs \\ %{}) do
     conversation = Map.get(attrs, :conversation) || group_conversation_fixture()
-    inviter = Map.get(attrs, :inviter) ||
-              Enum.find(conversation.conversation_participants, &(&1.role in ["admin", "moderator"]))
-              |> Map.get(:user) || user_fixture()
+
+    inviter =
+      Map.get(attrs, :inviter) ||
+        Enum.find(conversation.conversation_participants, &(&1.role in ["admin", "moderator"]))
+        |> Map.get(:user) || user_fixture()
+
     invitee = Map.get(attrs, :invitee) || user_fixture()
 
     _attrs =
@@ -83,11 +87,12 @@ defmodule Slap.GroupConversationFixtures do
       |> Map.drop([:conversation, :inviter, :invitee])
       |> Enum.into(%{})
 
-    {:ok, invite} = DirectMessaging.create_conversation_invite(
-      conversation,
-      invitee.id,
-      inviter
-    )
+    {:ok, invite} =
+      DirectMessaging.create_conversation_invite(
+        conversation,
+        invitee.id,
+        inviter
+      )
 
     invite
   end
@@ -109,11 +114,12 @@ defmodule Slap.GroupConversationFixtures do
         max_participants: 100
       })
 
-    {:ok, settings} = DirectMessaging.update_conversation_settings(
-      conversation,
-      attrs,
-      hd(conversation.conversation_participants).user
-    )
+    {:ok, settings} =
+      DirectMessaging.update_conversation_settings(
+        conversation,
+        attrs,
+        hd(conversation.conversation_participants).user
+      )
 
     settings
   end
@@ -129,13 +135,19 @@ defmodule Slap.GroupConversationFixtures do
     # Add participant if not already in conversation
     case DirectMessaging.get_conversation_participant(conversation.id, user.id) do
       nil ->
-        {:ok, participant} = DirectMessaging.add_participant_to_conversation(conversation, user.id)
+        {:ok, participant} =
+          DirectMessaging.add_participant_to_conversation(conversation, user.id)
 
         # Update role if not default
         if role != "member" do
-          admin_participant = Enum.find(conversation.conversation_participants, &(&1.role == "admin"))
+          admin_participant =
+            Enum.find(conversation.conversation_participants, &(&1.role == "admin"))
+
           admin = admin_participant.user
-          {:ok, participant} = DirectMessaging.promote_participant(conversation, user.id, role, admin)
+
+          {:ok, participant} =
+            DirectMessaging.promote_participant(conversation, user.id, role, admin)
+
           participant
         else
           participant
@@ -158,11 +170,12 @@ defmodule Slap.GroupConversationFixtures do
       |> Map.drop([:user1, :user2])
       |> Enum.into(%{})
 
-    {:ok, conversation} = DirectMessaging.create_direct_message_conversation(
-      attrs,
-      user1,
-      user2
-    )
+    {:ok, conversation} =
+      DirectMessaging.create_direct_message_conversation(
+        attrs,
+        user1,
+        user2
+      )
 
     conversation
   end

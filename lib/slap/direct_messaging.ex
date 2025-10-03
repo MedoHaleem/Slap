@@ -1,5 +1,6 @@
 defmodule Slap.DirectMessaging do
   alias Slap.Accounts.User
+
   alias Slap.Chat.{
     Conversation,
     DirectMessage,
@@ -8,7 +9,8 @@ defmodule Slap.DirectMessaging do
     ConversationInvite,
     Reaction
   }
-  alias Slap.{Repo, Uploads, Constants, Authorization, RateLimiter, ErrorHandler, Pagination, QueryBuilder}
+
+  alias Slap.{Repo, Uploads, Constants, Authorization, RateLimiter, ErrorHandler, QueryBuilder}
   import Ecto.Query
   require Logger
 
@@ -17,9 +19,7 @@ defmodule Slap.DirectMessaging do
   # Configuration constants
   @default_message_limit Constants.default_message_limit()
   # 1 minute window
-  @rate_limit_window Constants.rate_limit_window()
-  # max messages per user per conversation per window
-  @rate_limit_max_messages Constants.rate_limit_max_messages()
+  # Note: Rate limiting is now handled by Slap.RateLimiter module
 
   # Group conversation constants
   @max_participants Constants.max_participants()
@@ -44,19 +44,39 @@ defmodule Slap.DirectMessaging do
     conversation_type = Map.get(attrs, "type") || Map.get(attrs, :type) || "direct"
 
     # Validate that we don't have conflicting participant specifications
-    create_conversation_with_validation(attrs, participants, participant_ids, creator, conversation_type)
+    create_conversation_with_validation(
+      attrs,
+      participants,
+      participant_ids,
+      creator,
+      conversation_type
+    )
   end
 
   # Extract the conversation creation logic with validation
-  defp create_conversation_with_validation(attrs, participants, participant_ids, creator, conversation_type) do
+  defp create_conversation_with_validation(
+         attrs,
+         participants,
+         participant_ids,
+         creator,
+         conversation_type
+       ) do
     cond do
       participants != [] and participant_ids != [] ->
-        {:error, %Ecto.Changeset{errors: [participants: {"cannot specify both participants and participant_ids", []}], valid?: false}}
+        {:error,
+         %Ecto.Changeset{
+           errors: [participants: {"cannot specify both participants and participant_ids", []}],
+           valid?: false
+         }}
 
       participants == [] and participant_ids == [] ->
         # Check if this was called from create_conversation_with_participants with empty list
         if Map.has_key?(attrs, :_called_with_participants) do
-          {:error, %Ecto.Changeset{errors: [participants: {"must have at least 2 participants", []}], valid?: false}}
+          {:error,
+           %Ecto.Changeset{
+             errors: [participants: {"must have at least 2 participants", []}],
+             valid?: false
+           }}
         else
           # Simple conversation creation without participants
           create_simple_conversation(attrs)
@@ -77,14 +97,6 @@ defmodule Slap.DirectMessaging do
     %Conversation{}
     |> Conversation.changeset(attrs)
     |> Repo.insert()
-  end
-
-  # Helper function to extract user ID from options
-  defp get_user_id_from_opts(opts) do
-    case Keyword.get(opts, :creator) do
-      %User{id: user_id} -> user_id
-      _ -> nil
-    end
   end
 
   def create_group_conversation(attrs \\ %{}, participants, creator) do
@@ -174,7 +186,7 @@ defmodule Slap.DirectMessaging do
              %Conversation{}
              |> Conversation.changeset(attrs)
              |> Repo.insert(),
-            {:ok, _} <- add_participant_ids_to_conversation(conversation, participant_ids) do
+           {:ok, _} <- add_participant_ids_to_conversation(conversation, participant_ids) do
         # Create default settings for the conversation
         {:ok, _} = create_conversation_settings(conversation, conversation_type)
 
@@ -188,18 +200,23 @@ defmodule Slap.DirectMessaging do
   defp validate_participant_limits("direct", count) when count > 2 do
     {:error, "direct conversations can have maximum 2 participants"}
   end
+
   defp validate_participant_limits("direct", count) when count < 2 do
     {:error, "must have at least 2 participants"}
   end
+
   defp validate_participant_limits("group", count) when count < 2 do
     {:error, "must have at least 2 participants"}
   end
+
   defp validate_participant_limits("group", count) when count > @max_participants do
     {:error, "group conversations can have maximum #{@max_participants} participants"}
   end
+
   defp validate_participant_limits(_type, count) when count < 2 do
     {:error, "must have at least 2 participants"}
   end
+
   defp validate_participant_limits(_type, _count), do: :ok
 
   defp create_conversation_settings(conversation, conversation_type) do
@@ -243,7 +260,8 @@ defmodule Slap.DirectMessaging do
       |> ConversationParticipant.changeset(%{
         conversation_id: conversation.id,
         user_id: user_id,
-        role: "member", # Default role for ID-based addition
+        # Default role for ID-based addition
+        role: "member",
         can_invite: conversation.type != "direct"
       })
     end)
@@ -376,14 +394,16 @@ defmodule Slap.DirectMessaging do
         # Security check: Verify user is a participant in the conversation
         case get_conversation_participant(conversation.id, user.id) do
           nil ->
-            {:error, %Ecto.Changeset{errors: [authorization: {"Not authorized", []}], valid?: false}}
+            {:error,
+             %Ecto.Changeset{errors: [authorization: {"Not authorized", []}], valid?: false}}
 
           _participant ->
             create_message_with_broadcast(conversation, attrs, user)
         end
 
       {:error, :rate_limited} ->
-        {:error, %Ecto.Changeset{errors: [rate_limit: {"Rate limit exceeded", []}], valid?: false}}
+        {:error,
+         %Ecto.Changeset{errors: [rate_limit: {"Rate limit exceeded", []}], valid?: false}}
     end
   end
 
@@ -446,24 +466,26 @@ defmodule Slap.DirectMessaging do
 
     if user_id && get_conversation_participant(conversation_id, user_id) do
       # Use QueryBuilder to build the query
-      base_query = QueryBuilder.messages_query(
-        schema: DirectMessage,
-        conversation_id: conversation_id,
-        include_reactions: true,
-        include_attachments: true
-      )
+      base_query =
+        QueryBuilder.messages_query(
+          schema: DirectMessage,
+          conversation_id: conversation_id,
+          include_reactions: true,
+          include_attachments: true
+        )
 
       # Apply cursor-based pagination
       result = QueryBuilder.cursor_paginate_query(base_query, opts)
 
       # Execute the query and return the entries directly for backward compatibility
       case result do
-        %{entries: entries, metadata: metadata} ->
-          # For backward compatibility with tests, return just the entries
-          entries
         query when is_struct(query, Ecto.Query) ->
-          # If it's still a query, execute it
+          # Execute the query and return the results
           Repo.all(query)
+
+        _ ->
+          # Handle any other case
+          []
       end
     else
       []
@@ -783,7 +805,9 @@ defmodule Slap.DirectMessaging do
       nil ->
         # Create default settings if they don't exist
         create_default_conversation_settings(conversation_id)
-      settings -> {:ok, settings}
+
+      settings ->
+        {:ok, settings}
     end
   end
 
@@ -805,7 +829,11 @@ defmodule Slap.DirectMessaging do
   @doc """
   Updates conversation settings. Only admins and moderators can update settings.
   """
-  def update_conversation_settings(%Conversation{} = conversation, attrs, %User{id: user_id} = user) do
+  def update_conversation_settings(
+        %Conversation{} = conversation,
+        attrs,
+        %User{id: _user_id} = user
+      ) do
     if Authorization.can_manage_conversation?(user, conversation) do
       case get_conversation_settings(conversation) do
         {:ok, settings} ->
@@ -813,7 +841,8 @@ defmodule Slap.DirectMessaging do
           |> ConversationSetting.changeset(attrs)
           |> Repo.update()
 
-        {:error, _reason} = error -> error
+        {:error, _reason} = error ->
+          error
       end
     else
       {:error, "Insufficient permissions to update conversation settings"}
@@ -835,25 +864,37 @@ defmodule Slap.DirectMessaging do
   """
   def user_has_permission?(conversation_id, user_id, permission) do
     case get_conversation!(conversation_id) do
-      nil -> false
-      conversation -> Authorization.can_access_conversation?(%User{id: user_id}, conversation, permission)
+      nil ->
+        false
+
+      conversation ->
+        Authorization.can_access_conversation?(%User{id: user_id}, conversation, permission)
     end
   end
 
   @doc """
   Promotes a participant to a higher role. Only admins can promote participants.
   """
-  def promote_participant(%Conversation{id: conversation_id} = conversation, target_user_id, new_role, %User{id: user_id} = user) do
+  def promote_participant(
+        %Conversation{id: conversation_id} = conversation,
+        target_user_id,
+        new_role,
+        %User{id: _user_id} = user
+      ) do
     if Authorization.can_manage_participants?(user, conversation) do
       case get_conversation_participant(conversation_id, target_user_id) do
-        nil -> {:error, "Participant not found"}
+        nil ->
+          {:error, "Participant not found"}
+
         target_participant ->
           case Authorization.validate_role_promotion(target_participant.role, new_role) do
             :ok ->
               target_participant
               |> ConversationParticipant.changeset(%{role: new_role})
               |> Repo.update()
-            {:error, reason} -> {:error, reason}
+
+            {:error, reason} ->
+              {:error, reason}
           end
       end
     else
@@ -864,10 +905,14 @@ defmodule Slap.DirectMessaging do
   @doc """
   Creates an invitation for a user to join a conversation.
   """
-  def create_conversation_invite(%Conversation{id: conversation_id} = conversation, invitee_id, %User{id: inviter_id} = inviter) do
+  def create_conversation_invite(
+        %Conversation{id: conversation_id} = conversation,
+        invitee_id,
+        %User{id: inviter_id} = inviter
+      ) do
     if Authorization.can_invite_to_conversation?(inviter, conversation) do
       case get_conversation_settings(conversation) do
-        {:ok, settings} ->
+        {:ok, _settings} ->
           case validate_user_not_already_participant(conversation_id, invitee_id) do
             {:ok, :not_participant} ->
               token = generate_invite_token()
@@ -880,22 +925,26 @@ defmodule Slap.DirectMessaging do
                 token: token
               })
               |> Repo.insert()
-            {:error, reason} -> ErrorHandler.error_with_message(reason)
+
+            {:error, reason} ->
+              ErrorHandler.error_with_message(reason)
           end
-        {:error, _reason} = error -> error
+
+        {:error, _reason} = error ->
+          error
       end
     else
       ErrorHandler.authorization_error()
     end
   end
 
-  defp validate_invite_permissions(settings, inviter_role) do
-    cond do
-      settings.allow_participant_invites -> :ok
-      inviter_role in ["admin", "moderator"] -> :ok
-      true -> {:error, "Invitations are disabled for this conversation"}
-    end
-  end
+  # defp validate_invite_permissions(settings, inviter_role) do
+  #   cond do
+  #     settings.allow_participant_invites -> :ok
+  #     inviter_role in ["admin", "moderator"] -> :ok
+  #     true -> {:error, "Invitations are disabled for this conversation"}
+  #   end
+  # end
 
   defp validate_user_not_already_participant(conversation_id, user_id) do
     case get_conversation_participant(conversation_id, user_id) do
@@ -928,10 +977,11 @@ defmodule Slap.DirectMessaging do
           {:error, "Invitation has expired"}
         else
           Repo.transaction(fn ->
-            with {:ok, participant} <- add_participant_to_conversation(
-                   %Conversation{id: invite.conversation_id},
-                   user_id
-                 ),
+            with {:ok, participant} <-
+                   add_participant_to_conversation(
+                     %Conversation{id: invite.conversation_id},
+                     user_id
+                   ),
                  {:ok, _} <-
                    invite
                    |> ConversationInvite.changeset(%{status: "accepted"})
@@ -975,7 +1025,9 @@ defmodule Slap.DirectMessaging do
     limit = Keyword.get(opts, :limit, 20)
 
     Conversation
-    |> join(:left, [c], p in ConversationParticipant, on: c.id == p.conversation_id and p.user_id == ^user_id)
+    |> join(:left, [c], p in ConversationParticipant,
+      on: c.id == p.conversation_id and p.user_id == ^user_id
+    )
     |> where([c, p], c.is_public == true and c.type == "group" and is_nil(p.id))
     |> order_by([c], desc: c.last_message_at)
     |> preload(conversation_participants: :user)

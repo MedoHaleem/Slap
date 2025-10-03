@@ -5,6 +5,17 @@ defmodule Slap.Chat.RoomMembership do
   alias Slap.Accounts.User
   alias Slap.Chat.Room
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          room_id: integer(),
+          user_id: integer(),
+          last_read_id: integer() | nil,
+          room: Room.t() | Ecto.Association.NotLoaded.t(),
+          user: User.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "room_memberships" do
     belongs_to :room, Room
     belongs_to :user, User

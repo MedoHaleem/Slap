@@ -8,6 +8,21 @@ defmodule Slap.Chat.ConversationInvite do
   @statuses ["pending", "accepted", "declined", "expired"]
   @invite_expiry_days 7
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          conversation_id: integer(),
+          inviter_id: integer(),
+          invitee_id: integer(),
+          status: String.t(),
+          expires_at: DateTime.t() | nil,
+          token: String.t(),
+          conversation: Conversation.t() | Ecto.Association.NotLoaded.t(),
+          inviter: User.t() | Ecto.Association.NotLoaded.t(),
+          invitee: User.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "conversation_invites" do
     belongs_to :conversation, Conversation
     belongs_to :inviter, User
@@ -51,11 +66,15 @@ defmodule Slap.Chat.ConversationInvite do
   defp maybe_set_expires_at(changeset) do
     case get_change(changeset, :expires_at) do
       nil ->
-        expires_at = DateTime.utc_now()
-        |> DateTime.add(@invite_expiry_days * 24 * 60 * 60, :second)
-        |> DateTime.truncate(:second)
+        expires_at =
+          DateTime.utc_now()
+          |> DateTime.add(@invite_expiry_days * 24 * 60 * 60, :second)
+          |> DateTime.truncate(:second)
+
         put_change(changeset, :expires_at, expires_at)
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
 

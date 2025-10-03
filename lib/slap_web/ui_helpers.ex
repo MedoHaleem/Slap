@@ -5,8 +5,6 @@ defmodule SlapWeb.UIHelpers do
   """
 
   use Phoenix.Component
-  import Phoenix.HTML
-  import Phoenix.HTML.Form
 
   alias Slap.Constants
 
@@ -23,8 +21,12 @@ defmodule SlapWeb.UIHelpers do
     assigns = assign_new(assigns, :class, fn -> "" end)
 
     ~H"""
-    <button class={["#{Constants.get_css_class(:primary_button)}", @class]} disabled={@disabled} {@rest}>
-      <%= render_slot(@inner_block) %>
+    <button
+      class={["#{Constants.get_css_class(:primary_button)}", @class]}
+      disabled={@disabled}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -42,7 +44,7 @@ defmodule SlapWeb.UIHelpers do
 
     ~H"""
     <button class={["#{Constants.get_css_class(:secondary_button)}", @class]} {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -60,7 +62,7 @@ defmodule SlapWeb.UIHelpers do
 
     ~H"""
     <button class={["#{Constants.get_css_class(:danger_button)}", @class]} {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -78,7 +80,7 @@ defmodule SlapWeb.UIHelpers do
 
     ~H"""
     <button class={["#{Constants.get_css_class(:success_button)}", @class]} {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -112,18 +114,20 @@ defmodule SlapWeb.UIHelpers do
   Renders a user avatar with consistent styling.
   """
   attr :user, :map, required: true
-  attr :size, :string, default: "normal" # "small", "normal", "large"
+  # "small", "normal", "large"
+  attr :size, :string, default: "normal"
   attr :class, :string, default: ""
   attr :rest, :global
 
   def user_avatar(assigns) do
     assigns = assign_new(assigns, :class, fn -> "" end)
 
-    avatar_class = case assigns.size do
-      "small" -> Constants.get_css_class(:small_avatar)
-      "large" -> Constants.get_css_class(:large_avatar)
-      _ -> Constants.get_css_class(:avatar)
-    end
+    avatar_class =
+      case assigns.size do
+        "small" -> Constants.get_css_class(:small_avatar)
+        "large" -> Constants.get_css_class(:large_avatar)
+        _ -> Constants.get_css_class(:avatar)
+      end
 
     assigns = assign(assigns, :avatar_class, avatar_class)
 
@@ -166,11 +170,12 @@ defmodule SlapWeb.UIHelpers do
   def presence_indicator(assigns) do
     assigns = assign_new(assigns, :class, fn -> "" end)
 
-    indicator_class = if assigns.online do
-      Constants.get_css_class(:online_indicator)
-    else
-      Constants.get_css_class(:offline_indicator)
-    end
+    indicator_class =
+      if assigns.online do
+        Constants.get_css_class(:online_indicator)
+      else
+        Constants.get_css_class(:offline_indicator)
+      end
 
     assigns = assign(assigns, :indicator_class, indicator_class)
 
@@ -213,7 +218,7 @@ defmodule SlapWeb.UIHelpers do
 
     ~H"""
     <div class={["#{Constants.get_css_class(:message_container)}", @class]} {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -231,7 +236,7 @@ defmodule SlapWeb.UIHelpers do
 
     ~H"""
     <div class={["#{Constants.get_css_class(:message_content)}", @class]} {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -247,20 +252,24 @@ defmodule SlapWeb.UIHelpers do
   def message_timestamp(assigns) do
     assigns = assign_new(assigns, :class, fn -> "" end)
 
-    formatted_time = case assigns.format do
-      "relative" ->
-        if function_exported?(Timex, :format, 2) do
-          Timex.format!(assigns.timestamp, "{relative}")
-        else
+    formatted_time =
+      case assigns.format do
+        "relative" ->
+          if function_exported?(Timex, :format, 2) do
+            Timex.format!(assigns.timestamp, "{relative}")
+          else
+            Calendar.strftime(assigns.timestamp, Constants.message_timestamp_format())
+          end
+
+        "absolute" ->
           Calendar.strftime(assigns.timestamp, Constants.message_timestamp_format())
-        end
-      "absolute" ->
-        Calendar.strftime(assigns.timestamp, Constants.message_timestamp_format())
-      "datetime" ->
-        Calendar.strftime(assigns.timestamp, Constants.datetime_format())
-      _ ->
-        Calendar.strftime(assigns.timestamp, Constants.message_timestamp_format())
-    end
+
+        "datetime" ->
+          Calendar.strftime(assigns.timestamp, Constants.datetime_format())
+
+        _ ->
+          Calendar.strftime(assigns.timestamp, Constants.message_timestamp_format())
+      end
 
     assigns = assign(assigns, :formatted_time, formatted_time)
 
@@ -310,23 +319,33 @@ defmodule SlapWeb.UIHelpers do
   @doc """
   Renders a loading spinner.
   """
-  attr :size, :string, default: "medium" # "small", "medium", "large"
+  # "small", "medium", "large"
+  attr :size, :string, default: "medium"
   attr :class, :string, default: ""
   attr :rest, :global
 
   def loading_spinner(assigns) do
     assigns = assign_new(assigns, :class, fn -> "" end)
 
-    size_class = case assigns.size do
-      "small" -> "w-4 h-4"
-      "large" -> "w-8 h-8"
-      _ -> "w-6 h-6"
-    end
+    size_class =
+      case assigns.size do
+        "small" -> "w-4 h-4"
+        "large" -> "w-8 h-8"
+        _ -> "w-6 h-6"
+      end
 
     assigns = assign(assigns, :size_class, size_class)
 
     ~H"""
-    <div class={["animate-spin rounded-full border-2 border-gray-300 border-t-blue-600", @size_class, @class]} {@rest}></div>
+    <div
+      class={[
+        "animate-spin rounded-full border-2 border-gray-300 border-t-blue-600",
+        @size_class,
+        @class
+      ]}
+      {@rest}
+    >
+    </div>
     """
   end
 
@@ -348,7 +367,12 @@ defmodule SlapWeb.UIHelpers do
     <div class={["flex flex-col items-center justify-center py-12", @class]} {@rest}>
       <div class="w-12 h-12 text-gray-400 mb-4">
         <svg class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
         </svg>
       </div>
 
@@ -360,7 +384,7 @@ defmodule SlapWeb.UIHelpers do
 
       <%= if @actions != [] do %>
         <div class="flex space-x-3">
-          <%= render_slot(@actions) %>
+          {render_slot(@actions)}
         </div>
       <% end %>
     </div>
@@ -378,12 +402,16 @@ defmodule SlapWeb.UIHelpers do
         else
           Calendar.strftime(timestamp, Constants.message_timestamp_format())
         end
+
       "absolute" ->
         Calendar.strftime(timestamp, Constants.message_timestamp_format())
+
       "datetime" ->
         Calendar.strftime(timestamp, Constants.datetime_format())
+
       "date" ->
         Calendar.strftime(timestamp, Constants.date_format())
+
       _ ->
         Calendar.strftime(timestamp, Constants.message_timestamp_format())
     end

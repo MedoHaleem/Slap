@@ -30,9 +30,7 @@ defmodule Slap.Repo.Migrations.AddGroupConversationPerformanceIndexes do
            )
 
     # Index for conversation invites status queries
-    create index(:conversation_invites, [:invitee_id, :status],
-             name: :idx_invites_user_status
-           )
+    create index(:conversation_invites, [:invitee_id, :status], name: :idx_invites_user_status)
 
     create index(:conversation_invites, [:conversation_id, :status],
              name: :idx_invites_conversation_status

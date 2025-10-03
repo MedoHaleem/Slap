@@ -6,9 +6,11 @@ defmodule Slap.Constants do
 
   # Rate limiting constants
   @default_message_limit 50
-  @rate_limit_window 60_000  # 1 minute in milliseconds
+  # 1 minute in milliseconds
+  @rate_limit_window 60_000
   @rate_limit_max_messages 30
-  @heartbeat_interval 30_000  # 30 seconds in milliseconds
+  # 30 seconds in milliseconds
+  @heartbeat_interval 30_000
 
   # Conversation constants
   @max_participants 100
@@ -16,7 +18,8 @@ defmodule Slap.Constants do
   @max_direct_conversation_name_length 30
 
   # File upload constants
-  @max_file_size 10_000_000  # 10MB in bytes
+  # 10MB in bytes
+  @max_file_size 10_000_000
   @allowed_file_extensions ~w(.pdf)
 
   # Pagination constants
@@ -28,8 +31,10 @@ defmodule Slap.Constants do
   @max_search_results 50
 
   # UI constants
-  @debounce_timeout 300  # milliseconds
-  @typing_indicator_timeout 5_000  # milliseconds
+  # milliseconds
+  @debounce_timeout 300
+  # milliseconds
+  @typing_indicator_timeout 5_000
 
   # Time constants
   @message_timestamp_format "%I:%M %p"
@@ -76,15 +81,21 @@ defmodule Slap.Constants do
 
   # CSS class constants
   @css %{
-    primary_button: "px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500",
-    secondary_button: "px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500",
-    danger_button: "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500",
-    success_button: "px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500",
-    input_field: "border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500",
+    primary_button:
+      "px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500",
+    secondary_button:
+      "px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500",
+    danger_button:
+      "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500",
+    success_button:
+      "px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500",
+    input_field:
+      "border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500",
     avatar: "w-8 h-8 rounded-full",
     small_avatar: "w-6 h-6 rounded-full",
     large_avatar: "w-16 h-16 rounded-full",
-    unread_badge: "ml-2 flex-shrink-0 bg-red-500 text-white text-xs font-medium px-2 py-1 rounded-full",
+    unread_badge:
+      "ml-2 flex-shrink-0 bg-red-500 text-white text-xs font-medium px-2 py-1 rounded-full",
     online_indicator: "w-3 h-3 bg-green-400 rounded-full border-2 border-white",
     offline_indicator: "w-3 h-3 bg-gray-400 rounded-full border-2 border-white",
     message_container: "flex items-start space-x-3",
@@ -112,7 +123,8 @@ defmodule Slap.Constants do
 
   # Error messages
   @error_messages %{
-    rate_limit_exceeded: "Message rate limit exceeded. Please wait before sending another message.",
+    rate_limit_exceeded:
+      "Message rate limit exceeded. Please wait before sending another message.",
     not_participant: "User is not a participant in this conversation",
     insufficient_permissions: "You don't have permission to perform this action",
     conversation_not_found: "Conversation not found",

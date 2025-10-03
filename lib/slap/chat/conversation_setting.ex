@@ -7,6 +7,20 @@ defmodule Slap.Chat.ConversationSetting do
   @max_participants 1000
   @min_participants 2
 
+  @type t :: %__MODULE__{
+          id: integer(),
+          conversation_id: integer(),
+          allow_participant_invites: boolean(),
+          require_admin_approval: boolean(),
+          message_editing_enabled: boolean(),
+          file_sharing_enabled: boolean(),
+          max_participants: integer(),
+          custom_fields: map(),
+          conversation: Conversation.t() | Ecto.Association.NotLoaded.t(),
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   schema "conversation_settings" do
     belongs_to :conversation, Conversation
     field :allow_participant_invites, :boolean, default: true
